@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package fincore.ledger.v1;
+
+import "common/v1/money.proto";
+
+option go_package = "fincore/gen/proto/ledger/v1;ledgerv1";
+
+service LedgerService {
+  rpc PostEntry(PostEntryRequest) returns (PostEntryResponse);
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+}
+
+message AccountRef {
+  string account_id = 1;
+}
+
+enum EntryType {
+  ENTRY_TYPE_UNSPECIFIED = 0;
+  ENTRY_TYPE_DEPOSIT = 1;
+  ENTRY_TYPE_WITHDRAWAL = 2;
+}
+
+message PostEntryRequest {
+  string idempotency_key = 1;
+  EntryType entry_type = 2;
+  AccountRef account = 3;
+  fincore.common.v1.Money amount = 4;
+  string narration = 5;
+}
+
+message PostEntryResponse {
+  string entry_id = 1;
+}
+
+message GetBalanceRequest {
+  AccountRef account = 1;
+}
+
+message GetBalanceResponse {
+  fincore.common.v1.Money available_balance = 1;
+}
