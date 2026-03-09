@@ -14,3 +14,16 @@ type Store interface {
 	Appender
 	Reader
 }
+
+type SnapshotWriter interface {
+	SaveSnapshot(ctx context.Context, s Snapshot) error
+}
+
+type SnapshotReader interface {
+	LoadLatestSnapshot(ctx context.Context, aggregateID string) (*Snapshot, error)
+}
+
+type SnapshotStore interface {
+	SnapshotWriter
+	SnapshotReader
+}

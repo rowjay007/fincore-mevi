@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"fincore/pkg/eventstore"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -57,3 +59,34 @@ func (s *Store) Read(ctx context.Context, aggregateID string, fromVersionExclusi
 	}
 	return out, nil
 }
+
+func (s *Store) SaveSnapshot(ctx context.Context, snap eventstore.Snapshot) error {
+	_, err := s.q.Exec(ctx, `insert into event_store_snapshots(
+		aggregate_id, aggregate_type, version, created_at, data
+	) values ($1,$2,$3,$4,$5)`,
+		snap.AggregateID, snap.AggregateType, snap.Version, snap.CreatedAt, snap.Data,
+	)
+	return err
+}
+
+func (s *Store) LoadLatestSnapshot(ctx context.Context, aggregateID string) (*eventstore.Snapshot, error) {
+	row := s.q.QueryRow(ctx, `select aggregate_id, aggregate_type, version, created_at, data
+		from event_store_snapshots
+		where aggregate_id = $1
+		order by version desc
+		limit 1`, aggregateID)
+
+	var snap eventstore.Snapshot
+	var createdAt time.Time
+	err := row.Scan(&snap.AggregateID, &snap.AggregateType, &snap.Version, &createdAt, &snap.Data)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	snap.CreatedAt = createdAt
+	return &snap, nil
+}
+
+var _ eventstore.SnapshotStore = (*Store)(nil)
