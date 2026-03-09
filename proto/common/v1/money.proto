@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package fincore.common.v1;
 
-option go_package = "fincore/gen/proto/common/v1;commonv1";
+option go_package = "fincore/gen/common/v1;commonv1";
 
 message Money {
   string currency = 1; // "NGN" for Phase 1

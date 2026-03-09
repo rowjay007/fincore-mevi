@@ -4,7 +4,7 @@ package fincore.ledger.v1;
 
 import "common/v1/money.proto";
 
-option go_package = "fincore/gen/proto/ledger/v1;ledgerv1";
+option go_package = "fincore/gen/ledger/v1;ledgerv1";
 
 service LedgerService {
   rpc PostEntry(PostEntryRequest) returns (PostEntryResponse);

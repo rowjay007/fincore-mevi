@@ -7,7 +7,7 @@
 package ledgerv1
 
 import (
-	v1 "fincore/gen/proto/common/v1"
+	v1 "fincore/gen/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -352,7 +352,7 @@ const file_ledger_v1_ledger_proto_rawDesc = "" +
 	"\rLedgerService\x12V\n" +
 	"\tPostEntry\x12#.fincore.ledger.v1.PostEntryRequest\x1a$.fincore.ledger.v1.PostEntryResponse\x12Y\n" +
 	"\n" +
-	"GetBalance\x12$.fincore.ledger.v1.GetBalanceRequest\x1a%.fincore.ledger.v1.GetBalanceResponseB&Z$fincore/gen/proto/ledger/v1;ledgerv1b\x06proto3"
+	"GetBalance\x12$.fincore.ledger.v1.GetBalanceRequest\x1a%.fincore.ledger.v1.GetBalanceResponseB Z\x1efincore/gen/ledger/v1;ledgerv1b\x06proto3"
 
 var (
 	file_ledger_v1_ledger_proto_rawDescOnce sync.Once

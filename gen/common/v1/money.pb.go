@@ -81,7 +81,7 @@ const file_common_v1_money_proto_rawDesc = "" +
 	"\x05Money\x12\x1a\n" +
 	"\bcurrency\x18\x01 \x01(\tR\bcurrency\x12\x1f\n" +
 	"\vamount_kobo\x18\x02 \x01(\x03R\n" +
-	"amountKoboB&Z$fincore/gen/proto/common/v1;commonv1b\x06proto3"
+	"amountKoboB Z\x1efincore/gen/common/v1;commonv1b\x06proto3"
 
 var (
 	file_common_v1_money_proto_rawDescOnce sync.Once
