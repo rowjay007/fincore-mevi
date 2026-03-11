@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	commonv1 "fincore/gen/common/v1"
-	ledgerv1 "fincore/gen/ledger/v1"
+	commonv1 "fincore/gen/go/common/v1"
+	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/ids"
 	"fincore/pkg/money"
 	"fincore/services/ledger-service/application/commands"

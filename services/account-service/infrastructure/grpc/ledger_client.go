@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 
-	commonv1 "fincore/gen/common/v1"
-	ledgerv1 "fincore/gen/ledger/v1"
+	commonv1 "fincore/gen/go/common/v1"
+	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/ids"
 	"fincore/pkg/money"
 	"fincore/services/account-service/application/ports"
+
+	"google.golang.org/grpc"
 )
 
 type LedgerClient struct {
@@ -38,7 +40,7 @@ func (l *LedgerClient) PostEntry(ctx context.Context, idempotencyKey string, acc
 		Account:        &ledgerv1.AccountRef{AccountId: accountID.String()},
 		Amount:         &commonv1.Money{Currency: string(amount.Currency()), AmountKobo: amount.AmountKobo()},
 		Narration:      narration,
-	})
+	}, []grpc.CallOption{}...)
 	if err != nil {
 		return "", err
 	}
@@ -46,7 +48,7 @@ func (l *LedgerClient) PostEntry(ctx context.Context, idempotencyKey string, acc
 }
 
 func (l *LedgerClient) GetBalance(ctx context.Context, accountID ids.ID) (money.Money, error) {
-	resp, err := l.c.GetBalance(ctx, &ledgerv1.GetBalanceRequest{Account: &ledgerv1.AccountRef{AccountId: accountID.String()}})
+	resp, err := l.c.GetBalance(ctx, &ledgerv1.GetBalanceRequest{Account: &ledgerv1.AccountRef{AccountId: accountID.String()}}, []grpc.CallOption{}...)
 	if err != nil {
 		return money.Money{}, err
 	}

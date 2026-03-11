@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package fincore.account.v1;
+
+import "common/v1/money.proto";
+import "google/api/annotations.proto";
+
+option go_package = "fincore/gen/go/account/v1;accountv1";
+
+service AccountService {
+  rpc OpenAccount(OpenAccountRequest) returns (OpenAccountResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts"
+      body: "*"
+    };
+  }
+
+  rpc Deposit(DepositRequest) returns (DepositResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/{account_id}/deposit"
+      body: "*"
+    };
+  }
+
+  rpc Withdraw(WithdrawRequest) returns (WithdrawResponse) {
+    option (google.api.http) = {
+      post: "/v1/accounts/{account_id}/withdraw"
+      body: "*"
+    };
+  }
+
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse) {
+    option (google.api.http) = {
+      get: "/v1/accounts/{account_id}"
+    };
+  }
+}
+
+message OpenAccountRequest {
+  string customer_id = 1;
+  string idempotency_key = 2;
+}
+
+message OpenAccountResponse {
+  string account_id = 1;
+}
+
+message DepositRequest {
+  string account_id = 1;
+  string idempotency_key = 2;
+  fincore.common.v1.Money amount = 3;
+  string narration = 4;
+}
+
+message DepositResponse {
+  string entry_id = 1;
+}
+
+message WithdrawRequest {
+  string account_id = 1;
+  string idempotency_key = 2;
+  fincore.common.v1.Money amount = 3;
+  string narration = 4;
+}
+
+message WithdrawResponse {
+  string entry_id = 1;
+}
+
+message GetAccountRequest {
+  string account_id = 1;
+}
+
+message GetAccountResponse {
+  string account_id = 1;
+  string customer_id = 2;
+  string status = 3;
+  fincore.common.v1.Money available_balance = 4;
+}

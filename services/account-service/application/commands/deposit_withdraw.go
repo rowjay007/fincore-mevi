@@ -16,17 +16,17 @@ import (
 )
 
 type DepositMoney struct {
-	AccountID       ids.ID
-	Amount          money.Money
-	IdempotencyKey  string
-	Narration       string
+	AccountID      ids.ID
+	Amount         money.Money
+	IdempotencyKey string
+	Narration      string
 }
 
 type WithdrawMoney struct {
-	AccountID       ids.ID
-	Amount          money.Money
-	IdempotencyKey  string
-	Narration       string
+	AccountID      ids.ID
+	Amount         money.Money
+	IdempotencyKey string
+	Narration      string
 }
 
 type DepositWithdrawResult struct {
@@ -211,7 +211,7 @@ func loadAccount(ctx context.Context, es ports.AccountEventStore, accountID ids.
 	}
 	var des []domain.Event
 	for _, se := range events {
-		ev, err := unmarshalAccountEvent(se.Type, se.Data)
+		ev, err := UnmarshalAccountEvent(se.Type, se.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -220,7 +220,7 @@ func loadAccount(ctx context.Context, es ports.AccountEventStore, accountID ids.
 	return domain.Rehydrate(des)
 }
 
-func unmarshalAccountEvent(typ string, data []byte) (domain.Event, error) {
+func UnmarshalAccountEvent(typ string, data []byte) (domain.Event, error) {
 	switch typ {
 	case "account.opened.v1":
 		var e domain.AccountOpened

@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	ledgerv1 "fincore/gen/ledger/v1"
+	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/postgres"
 	"fincore/services/ledger-service/application/commands"
 	ledgergrpc "fincore/services/ledger-service/infrastructure/grpc"
