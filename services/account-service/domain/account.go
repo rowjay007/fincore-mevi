@@ -47,10 +47,10 @@ func NewAccount(customerID ids.ID) (*Account, error) {
 	return a, nil
 }
 
-func (a *Account) ID() ids.ID { return a.id }
+func (a *Account) ID() ids.ID         { return a.id }
 func (a *Account) CustomerID() ids.ID { return a.customerID }
-func (a *Account) Status() Status { return a.status }
-func (a *Account) Version() int64 { return a.version }
+func (a *Account) Status() Status     { return a.status }
+func (a *Account) Version() int64     { return a.version }
 
 func (a *Account) Freeze() error {
 	if a.status == StatusClosed {
@@ -106,6 +106,10 @@ func (a *Account) apply(e Event) {
 		a.status = StatusFrozen
 	case AccountClosed:
 		a.status = StatusClosed
+	case MoneyDeposited:
+		// balance is sourced from ledger-service; this event is kept for audit trail
+	case MoneyWithdrawn:
+		// balance is sourced from ledger-service; this event is kept for audit trail
 	}
 }
 
