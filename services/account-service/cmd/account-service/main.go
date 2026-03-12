@@ -76,13 +76,17 @@ func main() {
 
 	authInterceptor := func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		requiresAuth := false
+		requiredPerm := ""
 		switch {
 		case strings.HasSuffix(info.FullMethod, "/Deposit"):
 			requiresAuth = true
+			requiredPerm = "account:write"
 		case strings.HasSuffix(info.FullMethod, "/Withdraw"):
 			requiresAuth = true
+			requiredPerm = "account:write"
 		case strings.HasSuffix(info.FullMethod, "/GetAccount"):
 			requiresAuth = true
+			requiredPerm = "account:read"
 		}
 
 		if !requiresAuth {
@@ -106,8 +110,21 @@ func main() {
 		if tok == "" {
 			return nil, security.ErrInvalidToken
 		}
-		if _, err := tokens.VerifyToken(tok); err != nil {
+		payload, err := tokens.VerifyToken(tok)
+		if err != nil {
 			return nil, err
+		}
+		if requiredPerm != "" {
+			allowed := false
+			for _, p := range payload.Permissions {
+				if p == requiredPerm {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return nil, security.ErrInvalidToken
+			}
 		}
 		return handler(ctx, req)
 	}
