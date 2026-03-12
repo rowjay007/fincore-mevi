@@ -204,6 +204,90 @@ func (s *Server) ValidateToken(ctx context.Context, req *authv1.ValidateTokenReq
 	}, nil
 }
 
+func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenRequest) (*authv1.RefreshTokenResponse, error) {
+	refreshToken := strings.TrimSpace(req.RefreshToken)
+	if refreshToken == "" {
+		return nil, errors.New("refresh_token required")
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var userID string
+	var expiresAt time.Time
+	err = tx.QueryRow(ctx, `select user_id, expires_at from auth_refresh_tokens where token = $1`, refreshToken).Scan(&userID, &expiresAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("invalid refresh token")
+		}
+		return nil, err
+	}
+	if time.Now().UTC().After(expiresAt.UTC()) {
+		_, _ = tx.Exec(ctx, `delete from auth_refresh_tokens where token = $1`, refreshToken)
+		return nil, errors.New("expired refresh token")
+	}
+
+	_, err = tx.Exec(ctx, `delete from auth_refresh_tokens where token = $1`, refreshToken)
+	if err != nil {
+		return nil, err
+	}
+
+	newRefresh, err := newRefreshToken()
+	if err != nil {
+		return nil, err
+	}
+	newRefreshExp := time.Now().UTC().Add(s.refreshTTL)
+	_, err = tx.Exec(ctx, `insert into auth_refresh_tokens (token, user_id, expires_at) values ($1,$2,$3)`, newRefresh, userID, newRefreshExp)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	roles, perms, err := s.getRolesAndPermissions(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	accessExp := now.Add(s.accessTTL)
+	access, err := s.tokens.CreateToken(security.TokenPayload{
+		UserID:      userID,
+		Roles:       roles,
+		Permissions: perms,
+		IssuedAt:    now,
+		ExpiredAt:   accessExp,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &authv1.RefreshTokenResponse{
+		AccessToken:  access,
+		RefreshToken: newRefresh,
+		ExpiresIn:    int64(s.accessTTL.Seconds()),
+	}, nil
+}
+
+func (s *Server) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
+	refreshToken := strings.TrimSpace(req.RefreshToken)
+	if refreshToken == "" {
+		return nil, errors.New("refresh_token required")
+	}
+	_, err := s.pool.Exec(ctx, `delete from auth_refresh_tokens where token = $1`, refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	return &authv1.LogoutResponse{Success: true}, nil
+}
+
 func newRefreshToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

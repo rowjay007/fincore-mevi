@@ -1,9 +1,14 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "common/v1/money.proto",
+    "title": "ledger/v1/ledger.proto",
     "version": "version not set"
   },
+  "tags": [
+    {
+      "name": "LedgerService"
+    }
+  ],
   "consumes": [
     "application/json"
   ],
