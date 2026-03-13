@@ -1,0 +1,178 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "ledger/v1/ledger.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "LedgerService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/ledger/accounts/{account.accountId}/balance": {
+      "get": {
+        "operationId": "LedgerService_GetBalance",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetBalanceResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "account.accountId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "LedgerService"
+        ]
+      }
+    },
+    "/v1/ledger/entries": {
+      "post": {
+        "operationId": "LedgerService_PostEntry",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1PostEntryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1PostEntryRequest"
+            }
+          }
+        ],
+        "tags": [
+          "LedgerService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AccountRef": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        }
+      }
+    },
+    "v1EntryType": {
+      "type": "string",
+      "enum": [
+        "ENTRY_TYPE_UNSPECIFIED",
+        "ENTRY_TYPE_DEPOSIT",
+        "ENTRY_TYPE_WITHDRAWAL"
+      ],
+      "default": "ENTRY_TYPE_UNSPECIFIED"
+    },
+    "v1GetBalanceResponse": {
+      "type": "object",
+      "properties": {
+        "availableBalance": {
+          "$ref": "#/definitions/v1Money"
+        }
+      }
+    },
+    "v1Money": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "string",
+          "title": "\"NGN\" for Phase 1"
+        },
+        "amountKobo": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "v1PostEntryRequest": {
+      "type": "object",
+      "properties": {
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "entryType": {
+          "$ref": "#/definitions/v1EntryType"
+        },
+        "account": {
+          "$ref": "#/definitions/v1AccountRef"
+        },
+        "amount": {
+          "$ref": "#/definitions/v1Money"
+        },
+        "narration": {
+          "type": "string"
+        }
+      }
+    },
+    "v1PostEntryResponse": {
+      "type": "object",
+      "properties": {
+        "entryId": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
