@@ -6,17 +6,16 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 
 	accountv1 "fincore/gen/go/account/v1"
 	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/postgres"
 	"fincore/pkg/security"
+	"fincore/pkg/security/middleware"
 	"fincore/services/account-service/application/commands"
 	accountgrpc "fincore/services/account-service/infrastructure/grpc"
 	accountpg "fincore/services/account-service/infrastructure/postgres"
@@ -74,60 +73,11 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	authInterceptor := func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		requiresAuth := false
-		requiredPerm := ""
-		switch {
-		case strings.HasSuffix(info.FullMethod, "/Deposit"):
-			requiresAuth = true
-			requiredPerm = "account:write"
-		case strings.HasSuffix(info.FullMethod, "/Withdraw"):
-			requiresAuth = true
-			requiredPerm = "account:write"
-		case strings.HasSuffix(info.FullMethod, "/GetAccount"):
-			requiresAuth = true
-			requiredPerm = "account:read"
-		}
-
-		if !requiresAuth {
-			return handler(ctx, req)
-		}
-
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok {
-			return nil, security.ErrInvalidToken
-		}
-		vals := md.Get("authorization")
-		if len(vals) == 0 {
-			return nil, security.ErrInvalidToken
-		}
-		v := strings.TrimSpace(vals[0])
-		const prefix = "Bearer "
-		if !strings.HasPrefix(v, prefix) {
-			return nil, security.ErrInvalidToken
-		}
-		tok := strings.TrimSpace(strings.TrimPrefix(v, prefix))
-		if tok == "" {
-			return nil, security.ErrInvalidToken
-		}
-		payload, err := tokens.VerifyToken(tok)
-		if err != nil {
-			return nil, err
-		}
-		if requiredPerm != "" {
-			allowed := false
-			for _, p := range payload.Permissions {
-				if p == requiredPerm {
-					allowed = true
-					break
-				}
-			}
-			if !allowed {
-				return nil, security.ErrInvalidToken
-			}
-		}
-		return handler(ctx, req)
-	}
+	authInterceptor := middleware.UnaryAuthzInterceptor(tokens, map[string]string{
+		"/Deposit":    "account:write",
+		"/Withdraw":   "account:write",
+		"/GetAccount": "account:read",
+	})
 
 	s := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))
 	accountv1.RegisterAccountServiceServer(s, accountgrpc.NewServer(
@@ -146,12 +96,7 @@ func main() {
 	}()
 
 	// 5. Start HTTP Gateway
-	mux := runtime.NewServeMux(runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
-		if strings.EqualFold(key, "Authorization") {
-			return "authorization", true
-		}
-		return runtime.DefaultHeaderMatcher(key)
-	}))
+	mux := runtime.NewServeMux(middleware.GatewayAuthHeaderForwarder())
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	err = accountv1.RegisterAccountServiceHandlerFromEndpoint(ctx, mux, grpcAddr, opts)
 	if err != nil {

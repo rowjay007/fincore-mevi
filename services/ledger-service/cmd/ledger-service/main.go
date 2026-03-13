@@ -6,11 +6,11 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 
 	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/postgres"
 	"fincore/pkg/security"
+	"fincore/pkg/security/middleware"
 	"fincore/services/ledger-service/application/commands"
 	ledgergrpc "fincore/services/ledger-service/infrastructure/grpc"
 	ledgerpg "fincore/services/ledger-service/infrastructure/postgres"
@@ -19,7 +19,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -57,56 +56,10 @@ func main() {
 		panic(err)
 	}
 
-	authInterceptor := func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		requiresAuth := false
-		requiredPerm := ""
-		switch {
-		case strings.HasSuffix(info.FullMethod, "/PostEntry"):
-			requiresAuth = true
-			requiredPerm = "ledger:write"
-		case strings.HasSuffix(info.FullMethod, "/GetBalance"):
-			requiresAuth = true
-			requiredPerm = "ledger:read"
-		}
-		if !requiresAuth {
-			return handler(ctx, req)
-		}
-
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok {
-			return nil, security.ErrInvalidToken
-		}
-		vals := md.Get("authorization")
-		if len(vals) == 0 {
-			return nil, security.ErrInvalidToken
-		}
-		v := strings.TrimSpace(vals[0])
-		const prefix = "Bearer "
-		if !strings.HasPrefix(v, prefix) {
-			return nil, security.ErrInvalidToken
-		}
-		tok := strings.TrimSpace(strings.TrimPrefix(v, prefix))
-		if tok == "" {
-			return nil, security.ErrInvalidToken
-		}
-		payload, err := tokens.VerifyToken(tok)
-		if err != nil {
-			return nil, err
-		}
-		if requiredPerm != "" {
-			allowed := false
-			for _, p := range payload.Permissions {
-				if p == requiredPerm {
-					allowed = true
-					break
-				}
-			}
-			if !allowed {
-				return nil, security.ErrInvalidToken
-			}
-		}
-		return handler(ctx, req)
-	}
+	authInterceptor := middleware.UnaryAuthzInterceptor(tokens, map[string]string{
+		"/PostEntry":  "ledger:write",
+		"/GetBalance": "ledger:read",
+	})
 
 	s := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))
 	ledgerv1.RegisterLedgerServiceServer(s, ledgergrpc.NewServer(post, balQuery))
@@ -118,12 +71,7 @@ func main() {
 		}
 	}()
 
-	mux := runtime.NewServeMux(runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
-		if strings.EqualFold(key, "Authorization") {
-			return "authorization", true
-		}
-		return runtime.DefaultHeaderMatcher(key)
-	}))
+	mux := runtime.NewServeMux(middleware.GatewayAuthHeaderForwarder())
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	if err := ledgerv1.RegisterLedgerServiceHandlerFromEndpoint(ctx, mux, addr, opts); err != nil {
 		log.Fatalf("failed to register gateway: %v", err)
