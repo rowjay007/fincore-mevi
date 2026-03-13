@@ -14,19 +14,26 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Server struct {
 	authv1.UnimplementedAuthServiceServer
-	pool       *pgxpool.Pool
+	db         DB
 	tokens     security.TokenMaker
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 }
 
-func NewServer(pool *pgxpool.Pool, tokens security.TokenMaker, accessTTL time.Duration, refreshTTL time.Duration) *Server {
-	return &Server{pool: pool, tokens: tokens, accessTTL: accessTTL, refreshTTL: refreshTTL}
+type DB interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func NewServer(db DB, tokens security.TokenMaker, accessTTL time.Duration, refreshTTL time.Duration) *Server {
+	return &Server{db: db, tokens: tokens, accessTTL: accessTTL, refreshTTL: refreshTTL}
 }
 
 func (s *Server) Register(ctx context.Context, req *authv1.RegisterRequest) (*authv1.RegisterResponse, error) {
@@ -48,7 +55,7 @@ func (s *Server) Register(ctx context.Context, req *authv1.RegisterRequest) (*au
 
 	id := uuid.NewString()
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +88,7 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 
 	var userID string
 	var pwHash string
-	err := s.pool.QueryRow(ctx, `select id, password_hash from auth_users where email = $1`, email).Scan(&userID, &pwHash)
+	err := s.db.QueryRow(ctx, `select id, password_hash from auth_users where email = $1`, email).Scan(&userID, &pwHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("invalid credentials")
@@ -121,7 +128,7 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 	}
 	refreshExp := accessNow.Add(s.refreshTTL)
 	refreshHash := security.HashRefreshToken(refresh)
-	_, err = s.pool.Exec(ctx, `insert into auth_refresh_sessions (token_hash, user_id, expires_at) values ($1,$2,$3)`, refreshHash, userID, refreshExp)
+	_, err = s.db.Exec(ctx, `insert into auth_refresh_sessions (token_hash, user_id, expires_at) values ($1,$2,$3)`, refreshHash, userID, refreshExp)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +141,7 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 }
 
 func (s *Server) getRolesAndPermissions(ctx context.Context, userID string) ([]string, []string, error) {
-	rows, err := s.pool.Query(ctx, `
+	rows, err := s.db.Query(ctx, `
 		select r.name
 		from auth_roles r
 		join auth_user_roles ur on ur.role_id = r.id
@@ -158,7 +165,7 @@ func (s *Server) getRolesAndPermissions(ctx context.Context, userID string) ([]s
 		return nil, nil, err
 	}
 
-	permRows, err := s.pool.Query(ctx, `
+	permRows, err := s.db.Query(ctx, `
 		select distinct p.name
 		from auth_permissions p
 		join auth_role_permissions rp on rp.permission_id = p.id
@@ -212,7 +219,7 @@ func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenReque
 	}
 	refreshHash := security.HashRefreshToken(refreshToken)
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +305,7 @@ func (s *Server) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1
 		return nil, errors.New("refresh_token required")
 	}
 	h := security.HashRefreshToken(refreshToken)
-	_, err := s.pool.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where token_hash = $1 and revoked_at is null`, h, time.Now().UTC())
+	_, err := s.db.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where token_hash = $1 and revoked_at is null`, h, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +326,7 @@ func (s *Server) LogoutAll(ctx context.Context, req *authv1.LogoutAllRequest) (*
 		return nil, errors.New("invalid access token")
 	}
 
-	res, err := s.pool.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where user_id = $1 and revoked_at is null`, userID, time.Now().UTC())
+	res, err := s.db.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where user_id = $1 and revoked_at is null`, userID, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
