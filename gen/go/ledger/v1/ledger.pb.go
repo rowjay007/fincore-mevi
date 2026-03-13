@@ -8,6 +8,7 @@ package ledgerv1
 
 import (
 	v1 "fincore/gen/go/common/v1"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -327,7 +328,7 @@ var File_ledger_v1_ledger_proto protoreflect.FileDescriptor
 
 const file_ledger_v1_ledger_proto_rawDesc = "" +
 	"\n" +
-	"\x16ledger/v1/ledger.proto\x12\x11fincore.ledger.v1\x1a\x15common/v1/money.proto\"+\n" +
+	"\x16ledger/v1/ledger.proto\x12\x11fincore.ledger.v1\x1a\x15common/v1/money.proto\x1a\x1cgoogle/api/annotations.proto\"+\n" +
 	"\n" +
 	"AccountRef\x12\x1d\n" +
 	"\n" +
@@ -348,11 +349,11 @@ const file_ledger_v1_ledger_proto_rawDesc = "" +
 	"\tEntryType\x12\x1a\n" +
 	"\x16ENTRY_TYPE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ENTRY_TYPE_DEPOSIT\x10\x01\x12\x19\n" +
-	"\x15ENTRY_TYPE_WITHDRAWAL\x10\x022\xc2\x01\n" +
-	"\rLedgerService\x12V\n" +
-	"\tPostEntry\x12#.fincore.ledger.v1.PostEntryRequest\x1a$.fincore.ledger.v1.PostEntryResponse\x12Y\n" +
+	"\x15ENTRY_TYPE_WITHDRAWAL\x10\x022\x9c\x02\n" +
+	"\rLedgerService\x12u\n" +
+	"\tPostEntry\x12#.fincore.ledger.v1.PostEntryRequest\x1a$.fincore.ledger.v1.PostEntryResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/ledger/entries\x12\x93\x01\n" +
 	"\n" +
-	"GetBalance\x12$.fincore.ledger.v1.GetBalanceRequest\x1a%.fincore.ledger.v1.GetBalanceResponseB#Z!fincore/gen/go/ledger/v1;ledgerv1b\x06proto3"
+	"GetBalance\x12$.fincore.ledger.v1.GetBalanceRequest\x1a%.fincore.ledger.v1.GetBalanceResponse\"8\x82\xd3\xe4\x93\x022\x120/v1/ledger/accounts/{account.account_id}/balanceB#Z!fincore/gen/go/ledger/v1;ledgerv1b\x06proto3"
 
 var (
 	file_ledger_v1_ledger_proto_rawDescOnce sync.Once

@@ -3,12 +3,22 @@ syntax = "proto3";
 package fincore.ledger.v1;
 
 import "common/v1/money.proto";
+import "google/api/annotations.proto";
 
 option go_package = "fincore/gen/go/ledger/v1;ledgerv1";
 
 service LedgerService {
-  rpc PostEntry(PostEntryRequest) returns (PostEntryResponse);
-  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  rpc PostEntry(PostEntryRequest) returns (PostEntryResponse) {
+    option (google.api.http) = {
+      post: "/v1/ledger/entries"
+      body: "*"
+    };
+  }
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse) {
+    option (google.api.http) = {
+      get: "/v1/ledger/accounts/{account.account_id}/balance"
+    };
+  }
 }
 
 message AccountRef {

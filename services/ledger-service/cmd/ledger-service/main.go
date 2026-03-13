@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 
@@ -13,7 +15,10 @@ import (
 	ledgergrpc "fincore/services/ledger-service/infrastructure/grpc"
 	ledgerpg "fincore/services/ledger-service/infrastructure/postgres"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -24,6 +29,10 @@ func main() {
 	addr := os.Getenv("LEDGER_LISTEN_ADDR")
 	if addr == "" {
 		addr = ":50053"
+	}
+	httpAddr := os.Getenv("LEDGER_HTTP_ADDR")
+	if httpAddr == "" {
+		httpAddr = ":8083"
 	}
 
 	jwts := os.Getenv("AUTH_JWT_SECRET")
@@ -101,7 +110,27 @@ func main() {
 
 	s := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))
 	ledgerv1.RegisterLedgerServiceServer(s, ledgergrpc.NewServer(post, balQuery))
-	if err := s.Serve(l); err != nil {
-		panic(err)
+
+	go func() {
+		log.Printf("Starting gRPC server on %s", addr)
+		if err := s.Serve(l); err != nil {
+			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
+	mux := runtime.NewServeMux(runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
+		if strings.EqualFold(key, "Authorization") {
+			return "authorization", true
+		}
+		return runtime.DefaultHeaderMatcher(key)
+	}))
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	if err := ledgerv1.RegisterLedgerServiceHandlerFromEndpoint(ctx, mux, addr, opts); err != nil {
+		log.Fatalf("failed to register gateway: %v", err)
+	}
+
+	log.Printf("Starting HTTP gateway on %s", httpAddr)
+	if err := http.ListenAndServe(httpAddr, mux); err != nil {
+		log.Fatalf("failed to serve HTTP: %v", err)
 	}
 }
