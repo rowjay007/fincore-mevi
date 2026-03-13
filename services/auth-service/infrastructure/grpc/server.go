@@ -102,13 +102,13 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	accessExp := now.Add(s.accessTTL)
+	accessNow := time.Now().UTC()
+	accessExp := accessNow.Add(s.accessTTL)
 	access, err := s.tokens.CreateToken(security.TokenPayload{
 		UserID:      userID,
 		Roles:       roles,
 		Permissions: perms,
-		IssuedAt:    now,
+		IssuedAt:    accessNow,
 		ExpiredAt:   accessExp,
 	})
 	if err != nil {
@@ -119,8 +119,9 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 	if err != nil {
 		return nil, err
 	}
-	refreshExp := now.Add(s.refreshTTL)
-	_, err = s.pool.Exec(ctx, `insert into auth_refresh_tokens (token, user_id, expires_at) values ($1,$2,$3)`, refresh, userID, refreshExp)
+	refreshExp := accessNow.Add(s.refreshTTL)
+	refreshHash := security.HashRefreshToken(refresh)
+	_, err = s.pool.Exec(ctx, `insert into auth_refresh_sessions (token_hash, user_id, expires_at) values ($1,$2,$3)`, refreshHash, userID, refreshExp)
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +210,7 @@ func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenReque
 	if refreshToken == "" {
 		return nil, errors.New("refresh_token required")
 	}
+	refreshHash := security.HashRefreshToken(refreshToken)
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -220,29 +222,43 @@ func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenReque
 
 	var userID string
 	var expiresAt time.Time
-	err = tx.QueryRow(ctx, `select user_id, expires_at from auth_refresh_tokens where token = $1`, refreshToken).Scan(&userID, &expiresAt)
+	var revokedAt *time.Time
+	var replacedBy *string
+	err = tx.QueryRow(ctx, `
+		select user_id, expires_at, revoked_at, replaced_by_hash
+		from auth_refresh_sessions
+		where token_hash = $1
+		`, refreshHash).Scan(&userID, &expiresAt, &revokedAt, &replacedBy)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("invalid refresh token")
 		}
 		return nil, err
 	}
-	if time.Now().UTC().After(expiresAt.UTC()) {
-		_, _ = tx.Exec(ctx, `delete from auth_refresh_tokens where token = $1`, refreshToken)
-		return nil, errors.New("expired refresh token")
-	}
 
-	_, err = tx.Exec(ctx, `delete from auth_refresh_tokens where token = $1`, refreshToken)
-	if err != nil {
-		return nil, err
+	now := time.Now().UTC()
+	if revokedAt != nil || replacedBy != nil {
+		_, _ = tx.Exec(ctx, `update auth_refresh_sessions set revoked_at = coalesce(revoked_at, $2) where token_hash = $1`, refreshHash, now)
+		_, _ = tx.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where user_id = $1 and revoked_at is null`, userID, now)
+		return nil, errors.New("refresh token reuse detected")
+	}
+	if now.After(expiresAt.UTC()) {
+		_, _ = tx.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where token_hash = $1`, refreshHash, now)
+		return nil, errors.New("expired refresh token")
 	}
 
 	newRefresh, err := newRefreshToken()
 	if err != nil {
 		return nil, err
 	}
-	newRefreshExp := time.Now().UTC().Add(s.refreshTTL)
-	_, err = tx.Exec(ctx, `insert into auth_refresh_tokens (token, user_id, expires_at) values ($1,$2,$3)`, newRefresh, userID, newRefreshExp)
+	newHash := security.HashRefreshToken(newRefresh)
+	newRefreshExp := now.Add(s.refreshTTL)
+
+	_, err = tx.Exec(ctx, `update auth_refresh_sessions set last_used_at = $2, revoked_at = $2, replaced_by_hash = $3 where token_hash = $1`, refreshHash, now, newHash)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.Exec(ctx, `insert into auth_refresh_sessions (token_hash, user_id, expires_at) values ($1,$2,$3)`, newHash, userID, newRefreshExp)
 	if err != nil {
 		return nil, err
 	}
@@ -256,13 +272,13 @@ func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenReque
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	accessExp := now.Add(s.accessTTL)
+	accessNow := time.Now().UTC()
+	accessExp := accessNow.Add(s.accessTTL)
 	access, err := s.tokens.CreateToken(security.TokenPayload{
 		UserID:      userID,
 		Roles:       roles,
 		Permissions: perms,
-		IssuedAt:    now,
+		IssuedAt:    accessNow,
 		ExpiredAt:   accessExp,
 	})
 	if err != nil {
@@ -281,7 +297,8 @@ func (s *Server) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1
 	if refreshToken == "" {
 		return nil, errors.New("refresh_token required")
 	}
-	_, err := s.pool.Exec(ctx, `delete from auth_refresh_tokens where token = $1`, refreshToken)
+	h := security.HashRefreshToken(refreshToken)
+	_, err := s.pool.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where token_hash = $1 and revoked_at is null`, h, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
