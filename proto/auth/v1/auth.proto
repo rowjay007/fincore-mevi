@@ -35,6 +35,13 @@ service AuthService {
     };
   }
 
+  rpc LogoutAll(LogoutAllRequest) returns (LogoutAllResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout_all"
+      body: "*"
+    };
+  }
+
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
 }
 
@@ -75,6 +82,15 @@ message LogoutRequest {
 
 message LogoutResponse {
   bool success = 1;
+}
+
+message LogoutAllRequest {
+  string access_token = 1;
+}
+
+message LogoutAllResponse {
+  bool success = 1;
+  int64 revoked_sessions = 2;
 }
 
 message ValidateTokenRequest {

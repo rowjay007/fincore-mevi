@@ -430,6 +430,102 @@ func (x *LogoutResponse) GetSuccess() bool {
 	return false
 }
 
+type LogoutAllRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutAllRequest) Reset() {
+	*x = LogoutAllRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutAllRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutAllRequest) ProtoMessage() {}
+
+func (x *LogoutAllRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutAllRequest.ProtoReflect.Descriptor instead.
+func (*LogoutAllRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LogoutAllRequest) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+type LogoutAllResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Success         bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	RevokedSessions int64                  `protobuf:"varint,2,opt,name=revoked_sessions,json=revokedSessions,proto3" json:"revoked_sessions,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *LogoutAllResponse) Reset() {
+	*x = LogoutAllResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutAllResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutAllResponse) ProtoMessage() {}
+
+func (x *LogoutAllResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutAllResponse.ProtoReflect.Descriptor instead.
+func (*LogoutAllResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *LogoutAllResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *LogoutAllResponse) GetRevokedSessions() int64 {
+	if x != nil {
+		return x.RevokedSessions
+	}
+	return 0
+}
+
 type ValidateTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
@@ -439,7 +535,7 @@ type ValidateTokenRequest struct {
 
 func (x *ValidateTokenRequest) Reset() {
 	*x = ValidateTokenRequest{}
-	mi := &file_auth_v1_auth_proto_msgTypes[8]
+	mi := &file_auth_v1_auth_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -451,7 +547,7 @@ func (x *ValidateTokenRequest) String() string {
 func (*ValidateTokenRequest) ProtoMessage() {}
 
 func (x *ValidateTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_v1_auth_proto_msgTypes[8]
+	mi := &file_auth_v1_auth_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -464,7 +560,7 @@ func (x *ValidateTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateTokenRequest.ProtoReflect.Descriptor instead.
 func (*ValidateTokenRequest) Descriptor() ([]byte, []int) {
-	return file_auth_v1_auth_proto_rawDescGZIP(), []int{8}
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ValidateTokenRequest) GetAccessToken() string {
@@ -485,7 +581,7 @@ type ValidateTokenResponse struct {
 
 func (x *ValidateTokenResponse) Reset() {
 	*x = ValidateTokenResponse{}
-	mi := &file_auth_v1_auth_proto_msgTypes[9]
+	mi := &file_auth_v1_auth_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +593,7 @@ func (x *ValidateTokenResponse) String() string {
 func (*ValidateTokenResponse) ProtoMessage() {}
 
 func (x *ValidateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_v1_auth_proto_msgTypes[9]
+	mi := &file_auth_v1_auth_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +606,7 @@ func (x *ValidateTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateTokenResponse.ProtoReflect.Descriptor instead.
 func (*ValidateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_auth_v1_auth_proto_rawDescGZIP(), []int{9}
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ValidateTokenResponse) GetUserId() string {
@@ -563,18 +659,24 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\rLogoutRequest\x12#\n" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"*\n" +
 	"\x0eLogoutResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"9\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"5\n" +
+	"\x10LogoutAllRequest\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"X\n" +
+	"\x11LogoutAllResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12)\n" +
+	"\x10revoked_sessions\x18\x02 \x01(\x03R\x0frevokedSessions\"9\n" +
 	"\x14ValidateTokenRequest\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"h\n" +
 	"\x15ValidateTokenResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05roles\x18\x02 \x03(\tR\x05roles\x12 \n" +
-	"\vpermissions\x18\x03 \x03(\tR\vpermissions2\xa0\x04\n" +
+	"\vpermissions\x18\x03 \x03(\tR\vpermissions2\x94\x05\n" +
 	"\vAuthService\x12m\n" +
 	"\bRegister\x12 .fincore.auth.v1.RegisterRequest\x1a!.fincore.auth.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12a\n" +
 	"\x05Login\x12\x1d.fincore.auth.v1.LoginRequest\x1a\x1e.fincore.auth.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12x\n" +
 	"\fRefreshToken\x12$.fincore.auth.v1.RefreshTokenRequest\x1a%.fincore.auth.v1.RefreshTokenResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12e\n" +
-	"\x06Logout\x12\x1e.fincore.auth.v1.LogoutRequest\x1a\x1f.fincore.auth.v1.LogoutResponse\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/logout\x12^\n" +
+	"\x06Logout\x12\x1e.fincore.auth.v1.LogoutRequest\x1a\x1f.fincore.auth.v1.LogoutResponse\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/logout\x12r\n" +
+	"\tLogoutAll\x12!.fincore.auth.v1.LogoutAllRequest\x1a\".fincore.auth.v1.LogoutAllResponse\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/v1/auth/logout_all\x12^\n" +
 	"\rValidateToken\x12%.fincore.auth.v1.ValidateTokenRequest\x1a&.fincore.auth.v1.ValidateTokenResponseB\x1fZ\x1dfincore/gen/go/auth/v1;authv1b\x06proto3"
 
 var (
@@ -589,7 +691,7 @@ func file_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_auth_v1_auth_proto_rawDescData
 }
 
-var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_auth_v1_auth_proto_goTypes = []any{
 	(*RegisterRequest)(nil),       // 0: fincore.auth.v1.RegisterRequest
 	(*RegisterResponse)(nil),      // 1: fincore.auth.v1.RegisterResponse
@@ -599,25 +701,29 @@ var file_auth_v1_auth_proto_goTypes = []any{
 	(*RefreshTokenResponse)(nil),  // 5: fincore.auth.v1.RefreshTokenResponse
 	(*LogoutRequest)(nil),         // 6: fincore.auth.v1.LogoutRequest
 	(*LogoutResponse)(nil),        // 7: fincore.auth.v1.LogoutResponse
-	(*ValidateTokenRequest)(nil),  // 8: fincore.auth.v1.ValidateTokenRequest
-	(*ValidateTokenResponse)(nil), // 9: fincore.auth.v1.ValidateTokenResponse
+	(*LogoutAllRequest)(nil),      // 8: fincore.auth.v1.LogoutAllRequest
+	(*LogoutAllResponse)(nil),     // 9: fincore.auth.v1.LogoutAllResponse
+	(*ValidateTokenRequest)(nil),  // 10: fincore.auth.v1.ValidateTokenRequest
+	(*ValidateTokenResponse)(nil), // 11: fincore.auth.v1.ValidateTokenResponse
 }
 var file_auth_v1_auth_proto_depIdxs = []int32{
-	0, // 0: fincore.auth.v1.AuthService.Register:input_type -> fincore.auth.v1.RegisterRequest
-	2, // 1: fincore.auth.v1.AuthService.Login:input_type -> fincore.auth.v1.LoginRequest
-	4, // 2: fincore.auth.v1.AuthService.RefreshToken:input_type -> fincore.auth.v1.RefreshTokenRequest
-	6, // 3: fincore.auth.v1.AuthService.Logout:input_type -> fincore.auth.v1.LogoutRequest
-	8, // 4: fincore.auth.v1.AuthService.ValidateToken:input_type -> fincore.auth.v1.ValidateTokenRequest
-	1, // 5: fincore.auth.v1.AuthService.Register:output_type -> fincore.auth.v1.RegisterResponse
-	3, // 6: fincore.auth.v1.AuthService.Login:output_type -> fincore.auth.v1.LoginResponse
-	5, // 7: fincore.auth.v1.AuthService.RefreshToken:output_type -> fincore.auth.v1.RefreshTokenResponse
-	7, // 8: fincore.auth.v1.AuthService.Logout:output_type -> fincore.auth.v1.LogoutResponse
-	9, // 9: fincore.auth.v1.AuthService.ValidateToken:output_type -> fincore.auth.v1.ValidateTokenResponse
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: fincore.auth.v1.AuthService.Register:input_type -> fincore.auth.v1.RegisterRequest
+	2,  // 1: fincore.auth.v1.AuthService.Login:input_type -> fincore.auth.v1.LoginRequest
+	4,  // 2: fincore.auth.v1.AuthService.RefreshToken:input_type -> fincore.auth.v1.RefreshTokenRequest
+	6,  // 3: fincore.auth.v1.AuthService.Logout:input_type -> fincore.auth.v1.LogoutRequest
+	8,  // 4: fincore.auth.v1.AuthService.LogoutAll:input_type -> fincore.auth.v1.LogoutAllRequest
+	10, // 5: fincore.auth.v1.AuthService.ValidateToken:input_type -> fincore.auth.v1.ValidateTokenRequest
+	1,  // 6: fincore.auth.v1.AuthService.Register:output_type -> fincore.auth.v1.RegisterResponse
+	3,  // 7: fincore.auth.v1.AuthService.Login:output_type -> fincore.auth.v1.LoginResponse
+	5,  // 8: fincore.auth.v1.AuthService.RefreshToken:output_type -> fincore.auth.v1.RefreshTokenResponse
+	7,  // 9: fincore.auth.v1.AuthService.Logout:output_type -> fincore.auth.v1.LogoutResponse
+	9,  // 10: fincore.auth.v1.AuthService.LogoutAll:output_type -> fincore.auth.v1.LogoutAllResponse
+	11, // 11: fincore.auth.v1.AuthService.ValidateToken:output_type -> fincore.auth.v1.ValidateTokenResponse
+	6,  // [6:12] is the sub-list for method output_type
+	0,  // [0:6] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_auth_v1_auth_proto_init() }
@@ -631,7 +737,7 @@ func file_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_v1_auth_proto_rawDesc), len(file_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

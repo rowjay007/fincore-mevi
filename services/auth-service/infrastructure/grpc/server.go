@@ -305,6 +305,28 @@ func (s *Server) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1
 	return &authv1.LogoutResponse{Success: true}, nil
 }
 
+func (s *Server) LogoutAll(ctx context.Context, req *authv1.LogoutAllRequest) (*authv1.LogoutAllResponse, error) {
+	accessToken := strings.TrimSpace(req.AccessToken)
+	if accessToken == "" {
+		return nil, errors.New("access_token required")
+	}
+	payload, err := s.tokens.VerifyToken(accessToken)
+	if err != nil {
+		return nil, err
+	}
+	userID := strings.TrimSpace(payload.UserID)
+	if userID == "" {
+		return nil, errors.New("invalid access token")
+	}
+
+	res, err := s.pool.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where user_id = $1 and revoked_at is null`, userID, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+
+	return &authv1.LogoutAllResponse{Success: true, RevokedSessions: res.RowsAffected()}, nil
+}
+
 func newRefreshToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
