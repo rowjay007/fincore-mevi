@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
@@ -37,8 +38,8 @@ func main() {
 		httpAddr = ":8080"
 	}
 
-	jwts := os.Getenv("AUTH_JWT_SECRET")
-	tokens, err := security.NewJWTMaker(jwts)
+	jwksURL := os.Getenv("AUTH_JWKS_URL")
+	tokens, err := security.NewJWKSVerifier(jwksURL, 5*time.Minute)
 	if err != nil {
 		log.Fatalf("failed to create token maker: %v", err)
 	}

@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/json"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -24,7 +27,8 @@ func main() {
 	defer cancel()
 
 	dsn := os.Getenv("AUTH_DB_DSN")
-	jwtSecret := os.Getenv("AUTH_JWT_SECRET")
+	jwtKid := strings.TrimSpace(os.Getenv("AUTH_JWT_KID"))
+	jwtEd25519Priv := strings.TrimSpace(os.Getenv("AUTH_JWT_ED25519_PRIVATE_KEY"))
 
 	grpcAddr := os.Getenv("AUTH_GRPC_ADDR")
 	if grpcAddr == "" {
@@ -44,10 +48,20 @@ func main() {
 	}
 	defer pool.Close()
 
-	tokens, err := security.NewJWTMaker(jwtSecret)
+	priv, err := security.ParseEd25519PrivateKeyBase64URL(jwtEd25519Priv)
+	if err != nil {
+		log.Fatalf("failed to parse ed25519 private key: %v", err)
+	}
+	tokens, err := security.NewEd25519JWTMaker(jwtKid, ed25519.PrivateKey(priv))
 	if err != nil {
 		log.Fatalf("failed to create token maker: %v", err)
 	}
+	pub := ed25519.PrivateKey(priv).Public().(ed25519.PublicKey)
+	jwk, err := security.Ed25519PublicJWK(jwtKid, pub)
+	if err != nil {
+		log.Fatalf("failed to build jwk: %v", err)
+	}
+	jwks := security.JWKS{Keys: []security.JWK{jwk}}
 
 	srv := authgrpc.NewServer(pool, tokens, accessTTL, refreshTTL)
 
@@ -72,8 +86,15 @@ func main() {
 		log.Fatalf("failed to register gateway: %v", err)
 	}
 
+	h := http.NewServeMux()
+	h.Handle("/", mux)
+	h.HandleFunc("/jwks.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
+
 	log.Printf("Starting HTTP gateway on %s", httpAddr)
-	if err := http.ListenAndServe(httpAddr, mux); err != nil {
+	if err := http.ListenAndServe(httpAddr, h); err != nil {
 		log.Fatalf("failed to serve HTTP: %v", err)
 	}
 }

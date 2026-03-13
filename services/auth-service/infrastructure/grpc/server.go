@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"google.golang.org/grpc/metadata"
 )
 
 type Server struct {
@@ -314,6 +315,21 @@ func (s *Server) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1
 
 func (s *Server) LogoutAll(ctx context.Context, req *authv1.LogoutAllRequest) (*authv1.LogoutAllResponse, error) {
 	accessToken := strings.TrimSpace(req.AccessToken)
+	if accessToken == "" {
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			vals := md.Get("authorization")
+			if len(vals) == 0 {
+				vals = md.Get("Authorization")
+			}
+			if len(vals) > 0 {
+				v := strings.TrimSpace(vals[0])
+				lv := strings.ToLower(v)
+				if strings.HasPrefix(lv, "bearer ") {
+					accessToken = strings.TrimSpace(v[len("bearer "):])
+				}
+			}
+		}
+	}
 	if accessToken == "" {
 		return nil, errors.New("access_token required")
 	}

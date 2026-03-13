@@ -1,14 +1,19 @@
 package security
 
 import (
+	"crypto/ed25519"
 	"testing"
 	"time"
 )
 
 func TestJWTMaker_CreateAndVerify(t *testing.T) {
-	maker, err := NewJWTMaker("0123456789abcdef0123456789abcdef")
+	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("NewJWTMaker: %v", err)
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	maker, err := NewEd25519JWTMaker("k1", priv)
+	if err != nil {
+		t.Fatalf("NewEd25519JWTMaker: %v", err)
 	}
 
 	now := time.Now().UTC()
@@ -36,9 +41,13 @@ func TestJWTMaker_CreateAndVerify(t *testing.T) {
 }
 
 func TestJWTMaker_VerifyExpired(t *testing.T) {
-	maker, err := NewJWTMaker("0123456789abcdef0123456789abcdef")
+	_, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("NewJWTMaker: %v", err)
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	maker, err := NewEd25519JWTMaker("k1", priv)
+	if err != nil {
+		t.Fatalf("NewEd25519JWTMaker: %v", err)
 	}
 
 	now := time.Now().UTC()

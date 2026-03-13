@@ -1,9 +1,9 @@
 package security
 
 import (
+	"context"
+	"crypto/ed25519"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -27,8 +27,9 @@ type TokenMaker interface {
 	VerifyToken(token string) (*TokenPayload, error)
 }
 
-type JWTMaker struct {
-	secret []byte
+type Ed25519JWTMaker struct {
+	kid  string
+	priv ed25519.PrivateKey
 }
 
 type jwtClaims struct {
@@ -37,17 +38,17 @@ type jwtClaims struct {
 	jwt.RegisteredClaims
 }
 
-func NewJWTMaker(secret string) (*JWTMaker, error) {
-	if strings.TrimSpace(secret) == "" {
-		return nil, errors.New("secret required")
+func NewEd25519JWTMaker(kid string, priv ed25519.PrivateKey) (*Ed25519JWTMaker, error) {
+	if kid == "" {
+		return nil, errors.New("kid required")
 	}
-	if len(secret) < 32 {
-		return nil, fmt.Errorf("secret too short: got %d, want >= 32", len(secret))
+	if len(priv) != ed25519.PrivateKeySize {
+		return nil, errors.New("invalid ed25519 private key")
 	}
-	return &JWTMaker{secret: []byte(secret)}, nil
+	return &Ed25519JWTMaker{kid: kid, priv: priv}, nil
 }
 
-func (maker *JWTMaker) CreateToken(payload TokenPayload) (string, error) {
+func (maker *Ed25519JWTMaker) CreateToken(payload TokenPayload) (string, error) {
 	claims := jwtClaims{
 		Roles:       payload.Roles,
 		Permissions: payload.Permissions,
@@ -58,42 +59,19 @@ func (maker *JWTMaker) CreateToken(payload TokenPayload) (string, error) {
 		},
 	}
 
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString(maker.secret)
+	t := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
+	t.Header["kid"] = maker.kid
+	return t.SignedString(maker.priv)
 }
 
-func (maker *JWTMaker) VerifyToken(tokenStr string) (*TokenPayload, error) {
-	t, err := jwt.ParseWithClaims(tokenStr, &jwtClaims{}, func(token *jwt.Token) (any, error) {
-		if token.Method != jwt.SigningMethodHS256 {
+func (maker *Ed25519JWTMaker) VerifyToken(tokenStr string) (*TokenPayload, error) {
+	pub := maker.priv.Public().(ed25519.PublicKey)
+	return verifyEd25519JWT(tokenStr, func(_ context.Context, kid string) (ed25519.PublicKey, error) {
+		if kid != maker.kid {
 			return nil, ErrInvalidToken
 		}
-		return maker.secret, nil
+		return pub, nil
 	})
-	if err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, ErrExpiredToken
-		}
-		return nil, ErrInvalidToken
-	}
-
-	claims, ok := t.Claims.(*jwtClaims)
-	if !ok || !t.Valid {
-		return nil, ErrInvalidToken
-	}
-	if claims.Subject == "" {
-		return nil, ErrInvalidToken
-	}
-	if claims.IssuedAt == nil || claims.ExpiresAt == nil {
-		return nil, ErrInvalidToken
-	}
-
-	return &TokenPayload{
-		UserID:      claims.Subject,
-		Roles:       claims.Roles,
-		Permissions: claims.Permissions,
-		IssuedAt:    claims.IssuedAt.Time,
-		ExpiredAt:   claims.ExpiresAt.Time,
-	}, nil
 }
 
-var _ TokenMaker = (*JWTMaker)(nil)
+var _ TokenMaker = (*Ed25519JWTMaker)(nil)

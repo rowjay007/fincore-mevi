@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/postgres"
@@ -34,8 +35,8 @@ func main() {
 		httpAddr = ":8083"
 	}
 
-	jwts := os.Getenv("AUTH_JWT_SECRET")
-	tokens, err := security.NewJWTMaker(jwts)
+	jwksURL := os.Getenv("AUTH_JWKS_URL")
+	tokens, err := security.NewJWKSVerifier(jwksURL, 5*time.Minute)
 	if err != nil {
 		panic(err)
 	}
