@@ -50,6 +50,18 @@ func main() {
 
 	accessTTL := 15 * time.Minute
 	refreshTTL := 30 * 24 * time.Hour
+	cleanupInterval := 5 * time.Minute
+	if v := strings.TrimSpace(os.Getenv("AUTH_REFRESH_CLEANUP_INTERVAL")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			cleanupInterval = d
+		}
+	}
+	revokedRetention := 30 * 24 * time.Hour
+	if v := strings.TrimSpace(os.Getenv("AUTH_REFRESH_REVOKED_RETENTION")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			revokedRetention = d
+		}
+	}
 
 	pool, err := postgres.NewPool(ctx, postgres.Config{DSN: dsn})
 	if err != nil {
@@ -86,6 +98,26 @@ func main() {
 		log.Printf("Starting gRPC server on %s", grpcAddr)
 		if err := g.Serve(lis); err != nil {
 			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
+	go func() {
+		t := time.NewTicker(cleanupInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				expired, revoked, err := authgrpc.CleanupRefreshSessions(ctx, pool, revokedRetention)
+				if err != nil {
+					log.Printf("refresh session cleanup error: %v", err)
+					continue
+				}
+				if expired != 0 || revoked != 0 {
+					log.Printf("refresh session cleanup deleted: expired=%d revoked=%d", expired, revoked)
+				}
+			}
 		}
 	}()
 
