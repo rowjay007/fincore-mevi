@@ -62,16 +62,17 @@ func (v *JWKSVerifier) lookupKey(ctx context.Context, kid string) (ed25519.Publi
 		return nil, ErrInvalidToken
 	}
 
-	if key, ok := v.getCachedKey(kid); ok {
-		return key, nil
-	}
-
-	if err := v.refresh(ctx); err != nil {
-		// If refresh failed, try stale cache as a last resort.
-		if key, ok := v.getCachedKey(kid); ok {
-			return key, nil
+	v.mu.RLock()
+	stale := v.cachedKeys == nil || time.Since(v.cachedAt) >= v.cacheTTL
+	v.mu.RUnlock()
+	if stale {
+		if err := v.refresh(ctx); err != nil {
+			// If refresh failed, try stale cache as a last resort.
+			if key, ok := v.getCachedKey(kid); ok {
+				return key, nil
+			}
+			return nil, err
 		}
-		return nil, err
 	}
 
 	if key, ok := v.getCachedKey(kid); ok {

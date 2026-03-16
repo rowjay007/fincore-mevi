@@ -213,6 +213,100 @@ func (s *Server) ValidateToken(ctx context.Context, req *authv1.ValidateTokenReq
 	}, nil
 }
 
+func (s *Server) GrantRole(ctx context.Context, req *authv1.GrantRoleRequest) (*authv1.GrantRoleResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	userID := strings.TrimSpace(req.UserId)
+	roleName := strings.TrimSpace(req.RoleName)
+	if userID == "" {
+		return nil, errors.New("user_id required")
+	}
+	if roleName == "" {
+		return nil, errors.New("role_name required")
+	}
+
+	var roleID string
+	err := s.db.QueryRow(ctx, `select id from auth_roles where name = $1`, roleName).Scan(&roleID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("unknown role")
+		}
+		return nil, err
+	}
+
+	_, err = s.db.Exec(ctx, `insert into auth_user_roles (user_id, role_id) values ($1,$2) on conflict do nothing`, userID, roleID)
+	if err != nil {
+		return nil, err
+	}
+	return &authv1.GrantRoleResponse{Success: true}, nil
+}
+
+func (s *Server) RevokeRole(ctx context.Context, req *authv1.RevokeRoleRequest) (*authv1.RevokeRoleResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	userID := strings.TrimSpace(req.UserId)
+	roleName := strings.TrimSpace(req.RoleName)
+	if userID == "" {
+		return nil, errors.New("user_id required")
+	}
+	if roleName == "" {
+		return nil, errors.New("role_name required")
+	}
+
+	var roleID string
+	err := s.db.QueryRow(ctx, `select id from auth_roles where name = $1`, roleName).Scan(&roleID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("unknown role")
+		}
+		return nil, err
+	}
+
+	_, err = s.db.Exec(ctx, `delete from auth_user_roles where user_id = $1 and role_id = $2`, userID, roleID)
+	if err != nil {
+		return nil, err
+	}
+	return &authv1.RevokeRoleResponse{Success: true}, nil
+}
+
+func (s *Server) ListUserRoles(ctx context.Context, req *authv1.ListUserRolesRequest) (*authv1.ListUserRolesResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	userID := strings.TrimSpace(req.UserId)
+	if userID == "" {
+		return nil, errors.New("user_id required")
+	}
+
+	rows, err := s.db.Query(ctx, `
+		select r.name
+		from auth_roles r
+		join auth_user_roles ur on ur.role_id = r.id
+		where ur.user_id = $1
+		order by r.name
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var roles []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		roles = append(roles, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &authv1.ListUserRolesResponse{Roles: roles}, nil
+}
+
 func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenRequest) (*authv1.RefreshTokenResponse, error) {
 	refreshToken := strings.TrimSpace(req.RefreshToken)
 	if refreshToken == "" {
@@ -348,6 +442,36 @@ func (s *Server) LogoutAll(ctx context.Context, req *authv1.LogoutAllRequest) (*
 	}
 
 	return &authv1.LogoutAllResponse{Success: true, RevokedSessions: res.RowsAffected()}, nil
+}
+
+func (s *Server) requirePermissionFromAuthHeader(ctx context.Context, required string) error {
+	accessToken := ""
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		vals := md.Get("authorization")
+		if len(vals) == 0 {
+			vals = md.Get("Authorization")
+		}
+		if len(vals) > 0 {
+			v := strings.TrimSpace(vals[0])
+			lv := strings.ToLower(v)
+			if strings.HasPrefix(lv, "bearer ") {
+				accessToken = strings.TrimSpace(v[len("bearer "):])
+			}
+		}
+	}
+	if accessToken == "" {
+		return errors.New("access_token required")
+	}
+	payload, err := s.tokens.VerifyToken(accessToken)
+	if err != nil {
+		return err
+	}
+	for _, p := range payload.Permissions {
+		if p == required {
+			return nil
+		}
+	}
+	return errors.New("forbidden")
 }
 
 func newRefreshToken() (string, error) {

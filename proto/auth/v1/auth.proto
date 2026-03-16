@@ -42,6 +42,26 @@ service AuthService {
     };
   }
 
+  rpc GrantRole(GrantRoleRequest) returns (GrantRoleResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/admin/users/{user_id}/roles:grant"
+      body: "*"
+    };
+  }
+
+  rpc RevokeRole(RevokeRoleRequest) returns (RevokeRoleResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/admin/users/{user_id}/roles:revoke"
+      body: "*"
+    };
+  }
+
+  rpc ListUserRoles(ListUserRolesRequest) returns (ListUserRolesResponse) {
+    option (google.api.http) = {
+      get: "/v1/auth/admin/users/{user_id}/roles"
+    };
+  }
+
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
 }
 
@@ -101,4 +121,30 @@ message ValidateTokenResponse {
   string user_id = 1;
   repeated string roles = 2;
   repeated string permissions = 3;
+}
+
+message GrantRoleRequest {
+  string user_id = 1;
+  string role_name = 2;
+}
+
+message GrantRoleResponse {
+  bool success = 1;
+}
+
+message RevokeRoleRequest {
+  string user_id = 1;
+  string role_name = 2;
+}
+
+message RevokeRoleResponse {
+  bool success = 1;
+}
+
+message ListUserRolesRequest {
+  string user_id = 1;
+}
+
+message ListUserRolesResponse {
+  repeated string roles = 1;
 }
