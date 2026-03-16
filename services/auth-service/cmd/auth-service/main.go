@@ -29,6 +29,15 @@ func main() {
 	dsn := os.Getenv("AUTH_DB_DSN")
 	jwtKid := strings.TrimSpace(os.Getenv("AUTH_JWT_KID"))
 	jwtEd25519Priv := strings.TrimSpace(os.Getenv("AUTH_JWT_ED25519_PRIVATE_KEY"))
+	if strings.TrimSpace(dsn) == "" {
+		log.Fatalf("AUTH_DB_DSN is required")
+	}
+	if jwtKid == "" {
+		log.Fatalf("AUTH_JWT_KID is required")
+	}
+	if jwtEd25519Priv == "" {
+		log.Fatalf("AUTH_JWT_ED25519_PRIVATE_KEY is required")
+	}
 
 	grpcAddr := os.Getenv("AUTH_GRPC_ADDR")
 	if grpcAddr == "" {
