@@ -18,6 +18,7 @@ import (
 	authv1 "fincore/gen/go/auth/v1"
 	"fincore/pkg/postgres"
 	"fincore/pkg/security"
+	"fincore/pkg/security/middleware"
 	authgrpc "fincore/services/auth-service/infrastructure/grpc"
 )
 
@@ -121,7 +122,7 @@ func main() {
 		}
 	}()
 
-	mux := runtime.NewServeMux()
+	mux := runtime.NewServeMux(middleware.GatewayAuthHeaderForwarder())
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	if err := authv1.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
 		log.Fatalf("failed to register gateway: %v", err)

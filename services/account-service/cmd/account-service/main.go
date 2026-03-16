@@ -75,9 +75,10 @@ func main() {
 	}
 
 	authInterceptor := middleware.UnaryAuthzInterceptor(tokens, map[string]string{
-		"/Deposit":    "account:write",
-		"/Withdraw":   "account:write",
-		"/GetAccount": "account:read",
+		"/OpenAccount": "account:write",
+		"/Deposit":     "account:write",
+		"/Withdraw":    "account:write",
+		"/GetAccount":  "account:read",
 	})
 
 	s := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))

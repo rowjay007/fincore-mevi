@@ -8,7 +8,9 @@ import (
 	"fincore/pkg/security"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type stubMaker struct {
@@ -57,7 +59,11 @@ func TestUnaryAuthzInterceptor_DeniesWithoutPermission(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if err != security.ErrInvalidToken {
-		t.Fatalf("expected ErrInvalidToken, got %v", err)
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.PermissionDenied {
+		t.Fatalf("expected PermissionDenied, got %v", st.Code())
 	}
 }
