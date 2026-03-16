@@ -34,12 +34,14 @@ func TestRefreshToken_RotatesSession(t *testing.T) {
 	h := security.HashRefreshToken(refresh)
 
 	exp := time.Now().UTC().Add(1 * time.Hour)
+	absExp := exp
+	sessionID := "sess-1"
 
 	db.ExpectBegin()
-	db.ExpectQuery("select user_id, expires_at, revoked_at, replaced_by_hash").WithArgs(h).
-		WillReturnRows(pgxmock.NewRows([]string{"user_id", "expires_at", "revoked_at", "replaced_by_hash"}).AddRow("user-1", exp, nil, nil))
-	db.ExpectExec("update auth_refresh_sessions set last_used_at").WithArgs(h, pgxmock.AnyArg(), pgxmock.AnyArg()).WillReturnResult(pgxmock.NewResult("UPDATE", 1))
-	db.ExpectExec("insert into auth_refresh_sessions").WithArgs(pgxmock.AnyArg(), "user-1", pgxmock.AnyArg()).WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	db.ExpectQuery("select user_id, expires_at, absolute_expires_at, revoked_at, replaced_by_hash, session_id").WithArgs(h).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "expires_at", "absolute_expires_at", "revoked_at", "replaced_by_hash", "session_id"}).AddRow("user-1", exp, absExp, nil, nil, sessionID))
+	db.ExpectExec("update auth_refresh_sessions").WithArgs(h, pgxmock.AnyArg(), pgxmock.AnyArg(), nil, nil).WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	db.ExpectExec("insert into auth_refresh_sessions").WithArgs(pgxmock.AnyArg(), sessionID, "user-1", pgxmock.AnyArg(), absExp, nil, nil).WillReturnResult(pgxmock.NewResult("INSERT", 1))
 	db.ExpectCommit()
 
 	db.ExpectQuery("select r.name").WithArgs("user-1").
@@ -70,11 +72,13 @@ func TestRefreshToken_ReuseDetectionRevokesAll(t *testing.T) {
 	h := security.HashRefreshToken(refresh)
 
 	exp := time.Now().UTC().Add(1 * time.Hour)
+	absExp := exp
 	revoked := time.Now().UTC().Add(-1 * time.Minute)
+	sessionID := "sess-1"
 
 	db.ExpectBegin()
-	db.ExpectQuery("select user_id, expires_at, revoked_at, replaced_by_hash").WithArgs(h).
-		WillReturnRows(pgxmock.NewRows([]string{"user_id", "expires_at", "revoked_at", "replaced_by_hash"}).AddRow("user-1", exp, &revoked, nil))
+	db.ExpectQuery("select user_id, expires_at, absolute_expires_at, revoked_at, replaced_by_hash, session_id").WithArgs(h).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "expires_at", "absolute_expires_at", "revoked_at", "replaced_by_hash", "session_id"}).AddRow("user-1", exp, absExp, &revoked, nil, sessionID))
 	db.ExpectExec("update auth_refresh_sessions set revoked_at = coalesce").WithArgs(h, pgxmock.AnyArg()).WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 	db.ExpectExec("update auth_refresh_sessions set revoked_at =").WithArgs("user-1", pgxmock.AnyArg()).WillReturnResult(pgxmock.NewResult("UPDATE", 2))
 	db.ExpectRollback()

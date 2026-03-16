@@ -158,8 +158,13 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 		return nil, internal(err)
 	}
 	refreshExp := accessNow.Add(s.refreshTTL)
+	absExp := refreshExp
 	refreshHash := security.HashRefreshToken(refresh)
-	_, err = s.db.Exec(ctx, `insert into auth_refresh_sessions (token_hash, user_id, expires_at) values ($1,$2,$3)`, refreshHash, userID, refreshExp)
+	ua, ip := clientMetaFromContext(ctx)
+	_, err = s.db.Exec(ctx, `
+		insert into auth_refresh_sessions (token_hash, session_id, user_id, expires_at, absolute_expires_at, user_agent, ip)
+		values ($1,$1,$2,$3,$4,$5,$6)
+	`, refreshHash, userID, refreshExp, absExp, nullIfEmpty(ua), nullIfEmpty(ip))
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -357,13 +362,15 @@ func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenReque
 
 	var userID string
 	var expiresAt time.Time
+	var absExpiresAt time.Time
 	var revokedAt *time.Time
 	var replacedBy *string
+	var sessionID string
 	err = tx.QueryRow(ctx, `
-		select user_id, expires_at, revoked_at, replaced_by_hash
+		select user_id, expires_at, absolute_expires_at, revoked_at, replaced_by_hash, session_id
 		from auth_refresh_sessions
 		where token_hash = $1
-		`, refreshHash).Scan(&userID, &expiresAt, &revokedAt, &replacedBy)
+		`, refreshHash).Scan(&userID, &expiresAt, &absExpiresAt, &revokedAt, &replacedBy, &sessionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, unauth("invalid refresh token")
@@ -381,6 +388,10 @@ func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenReque
 		_, _ = tx.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where token_hash = $1`, refreshHash, now)
 		return nil, unauth("expired refresh token")
 	}
+	if now.After(absExpiresAt.UTC()) {
+		_, _ = tx.Exec(ctx, `update auth_refresh_sessions set revoked_at = $2 where token_hash = $1`, refreshHash, now)
+		return nil, unauth("expired refresh token")
+	}
 
 	newRefresh, err := newRefreshToken()
 	if err != nil {
@@ -388,12 +399,27 @@ func (s *Server) RefreshToken(ctx context.Context, req *authv1.RefreshTokenReque
 	}
 	newHash := security.HashRefreshToken(newRefresh)
 	newRefreshExp := now.Add(s.refreshTTL)
+	if newRefreshExp.After(absExpiresAt.UTC()) {
+		newRefreshExp = absExpiresAt.UTC()
+	}
+	ua, ip := clientMetaFromContext(ctx)
 
-	_, err = tx.Exec(ctx, `update auth_refresh_sessions set last_used_at = $2, revoked_at = $2, replaced_by_hash = $3 where token_hash = $1`, refreshHash, now, newHash)
+	_, err = tx.Exec(ctx, `
+		update auth_refresh_sessions
+		set last_used_at = $2,
+			revoked_at = $2,
+			replaced_by_hash = $3,
+			user_agent = coalesce($4, user_agent),
+			ip = coalesce($5, ip)
+		where token_hash = $1
+	`, refreshHash, now, newHash, nullIfEmpty(ua), nullIfEmpty(ip))
 	if err != nil {
 		return nil, internal(err)
 	}
-	_, err = tx.Exec(ctx, `insert into auth_refresh_sessions (token_hash, user_id, expires_at) values ($1,$2,$3)`, newHash, userID, newRefreshExp)
+	_, err = tx.Exec(ctx, `
+		insert into auth_refresh_sessions (token_hash, session_id, user_id, expires_at, absolute_expires_at, user_agent, ip)
+		values ($1,$2,$3,$4,$5,$6,$7)
+	`, newHash, sessionID, userID, newRefreshExp, absExpiresAt.UTC(), nullIfEmpty(ua), nullIfEmpty(ip))
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -511,6 +537,32 @@ func (s *Server) requirePermissionFromAuthHeader(ctx context.Context, required s
 		}
 	}
 	return forbidden("forbidden")
+}
+
+func clientMetaFromContext(ctx context.Context) (userAgent string, ip string) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", ""
+	}
+	ua := md.Get("user-agent")
+	if len(ua) > 0 {
+		userAgent = strings.TrimSpace(ua[0])
+	}
+	xff := md.Get("x-forwarded-for")
+	if len(xff) > 0 {
+		parts := strings.Split(xff[0], ",")
+		if len(parts) > 0 {
+			ip = strings.TrimSpace(parts[0])
+		}
+	}
+	return userAgent, ip
+}
+
+func nullIfEmpty(s string) any {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return s
 }
 
 func newRefreshToken() (string, error) {
