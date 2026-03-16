@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          test -z "$(gofmt -l .)"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: unit tests
+        run: go test ./...
+
+      - name: race tests
+        run: go test -race ./...
+
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+      - name: coverage threshold (security packages)
+        env:
+          MIN_COVERAGE: "70"
+        run: |
+          set -eu
+          go test ./pkg/security/... ./services/auth-service/infrastructure/grpc/... -coverprofile=coverage.out
+          pct=$(go tool cover -func=coverage.out | awk '/total:/ {gsub(/%/,"",$3); print $3}')
+          echo "coverage=${pct}% (min ${MIN_COVERAGE}%)"
+          awk -v p="$pct" -v min="$MIN_COVERAGE" 'BEGIN { exit (p+0 < min+0) }'
