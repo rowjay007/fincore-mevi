@@ -190,3 +190,106 @@ func TestTransactionalOutbox_LedgerService_RollbackPersistsNeither(t *testing.T)
 		t.Fatalf("expected no outbox messages on rollback, got %d", outboxCount)
 	}
 }
+
+func TestLedger_IdempotencyKeyDoesNotDoubleApply(t *testing.T) {
+	dsn := testDSNLedger()
+	if dsn == "" {
+		t.Skip("set LEDGER_TEST_DB_DSN or FINCORE_TEST_DB_DSN to run integration tests")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	pool, err := postgres.NewPool(ctx, postgres.Config{DSN: dsn})
+	if err != nil {
+		t.Fatalf("connect db: %v", err)
+	}
+	defer pool.Close()
+
+	ensureLedgerSchema(ctx, pool, t)
+
+	uow := NewUnitOfWork(pool)
+	h := commands.NewPostEntryHandler(uow)
+
+	acct := ids.New()
+	amt, _ := money.New(1000, money.NGN)
+
+	res1, err := h.Handle(ctx, commands.PostEntry{IdempotencyKey: "idem-same-1", AccountID: acct, Type: domain.EntryTypeDeposit, Amount: amt, Narration: "n"})
+	if err != nil {
+		t.Fatalf("post entry 1: %v", err)
+	}
+	res2, err := h.Handle(ctx, commands.PostEntry{IdempotencyKey: "idem-same-1", AccountID: acct, Type: domain.EntryTypeDeposit, Amount: amt, Narration: "n"})
+	if err != nil {
+		t.Fatalf("post entry 2: %v", err)
+	}
+	if res1.EntryID != res2.EntryID {
+		t.Fatalf("expected same entry id on idempotent retry")
+	}
+
+	var bal int64
+	if err := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, acct.String()).Scan(&bal); err != nil {
+		t.Fatalf("get balance: %v", err)
+	}
+	if bal != 1000 {
+		t.Fatalf("expected balance 1000, got %d", bal)
+	}
+
+	var outboxCount int
+	if err := pool.QueryRow(ctx, `select count(*) from outbox_messages`).Scan(&outboxCount); err != nil {
+		t.Fatalf("count outbox: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("expected 1 outbox message total, got %d", outboxCount)
+	}
+}
+
+func TestLedger_InsufficientFundsDoesNotPersist(t *testing.T) {
+	dsn := testDSNLedger()
+	if dsn == "" {
+		t.Skip("set LEDGER_TEST_DB_DSN or FINCORE_TEST_DB_DSN to run integration tests")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	pool, err := postgres.NewPool(ctx, postgres.Config{DSN: dsn})
+	if err != nil {
+		t.Fatalf("connect db: %v", err)
+	}
+	defer pool.Close()
+
+	ensureLedgerSchema(ctx, pool, t)
+
+	uow := NewUnitOfWork(pool)
+	h := commands.NewPostEntryHandler(uow)
+
+	acct := ids.New()
+	amt, _ := money.New(1000, money.NGN)
+
+	_, err = h.Handle(ctx, commands.PostEntry{IdempotencyKey: "idem-withdraw-1", AccountID: acct, Type: domain.EntryTypeWithdrawal, Amount: amt, Narration: "n"})
+	if err == nil {
+		t.Fatalf("expected insufficient funds error")
+	}
+
+	var outboxCount int
+	if err := pool.QueryRow(ctx, `select count(*) from outbox_messages`).Scan(&outboxCount); err != nil {
+		t.Fatalf("count outbox: %v", err)
+	}
+	if outboxCount != 0 {
+		t.Fatalf("expected 0 outbox messages, got %d", outboxCount)
+	}
+
+	var eventsCount int
+	if err := pool.QueryRow(ctx, `select count(*) from event_store_events`).Scan(&eventsCount); err != nil {
+		t.Fatalf("count events: %v", err)
+	}
+	if eventsCount != 0 {
+		t.Fatalf("expected 0 events, got %d", eventsCount)
+	}
+
+	var bal int64
+	row := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, acct.String())
+	if err := row.Scan(&bal); err == nil {
+		t.Fatalf("expected no balance row")
+	}
+}
