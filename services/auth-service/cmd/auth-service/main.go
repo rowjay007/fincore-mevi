@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,24 @@ func main() {
 
 	accessTTL := 15 * time.Minute
 	refreshTTL := 30 * 24 * time.Hour
+	loginMaxAttempts := 5
+	if v := strings.TrimSpace(os.Getenv("AUTH_LOGIN_MAX_ATTEMPTS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			loginMaxAttempts = n
+		}
+	}
+	loginWindow := 5 * time.Minute
+	if v := strings.TrimSpace(os.Getenv("AUTH_LOGIN_WINDOW")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			loginWindow = d
+		}
+	}
+	loginLockout := 15 * time.Minute
+	if v := strings.TrimSpace(os.Getenv("AUTH_LOGIN_LOCKOUT")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			loginLockout = d
+		}
+	}
 	cleanupInterval := 5 * time.Minute
 	if v := strings.TrimSpace(os.Getenv("AUTH_REFRESH_CLEANUP_INTERVAL")); v != "" {
 		if d, err := time.ParseDuration(v); err == nil && d > 0 {
@@ -85,7 +104,7 @@ func main() {
 	}
 	jwks := security.JWKS{Keys: []security.JWK{jwk}}
 
-	srv := authgrpc.NewServer(pool, tokens, accessTTL, refreshTTL)
+	srv := authgrpc.NewServerWithLoginLimiter(pool, tokens, accessTTL, refreshTTL, loginMaxAttempts, loginWindow, loginLockout)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {

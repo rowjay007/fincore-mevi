@@ -21,10 +21,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func invalidArg(msg string) error { return status.Error(codes.InvalidArgument, msg) }
-func unauth(msg string) error     { return status.Error(codes.Unauthenticated, msg) }
-func forbidden(msg string) error  { return status.Error(codes.PermissionDenied, msg) }
-func notFound(msg string) error   { return status.Error(codes.NotFound, msg) }
+func invalidArg(msg string) error  { return status.Error(codes.InvalidArgument, msg) }
+func unauth(msg string) error      { return status.Error(codes.Unauthenticated, msg) }
+func forbidden(msg string) error   { return status.Error(codes.PermissionDenied, msg) }
+func notFound(msg string) error    { return status.Error(codes.NotFound, msg) }
+func rateLimited(msg string) error { return status.Error(codes.ResourceExhausted, msg) }
 func internal(err error) error {
 	if err == nil {
 		return status.Error(codes.Internal, "internal error")
@@ -49,6 +50,7 @@ type Server struct {
 	tokens     security.TokenMaker
 	accessTTL  time.Duration
 	refreshTTL time.Duration
+	limiter    *loginLimiter
 }
 
 type DB interface {
@@ -60,6 +62,10 @@ type DB interface {
 
 func NewServer(db DB, tokens security.TokenMaker, accessTTL time.Duration, refreshTTL time.Duration) *Server {
 	return &Server{db: db, tokens: tokens, accessTTL: accessTTL, refreshTTL: refreshTTL}
+}
+
+func NewServerWithLoginLimiter(db DB, tokens security.TokenMaker, accessTTL time.Duration, refreshTTL time.Duration, maxAttempts int, window time.Duration, lockout time.Duration) *Server {
+	return &Server{db: db, tokens: tokens, accessTTL: accessTTL, refreshTTL: refreshTTL, limiter: newLoginLimiter(maxAttempts, window, lockout)}
 }
 
 func (s *Server) Register(ctx context.Context, req *authv1.RegisterRequest) (*authv1.RegisterResponse, error) {
@@ -116,12 +122,24 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 	if password == "" {
 		return nil, invalidArg("password required")
 	}
+	ua, ip := clientMetaFromContext(ctx)
+	if s.limiter != nil {
+		key := email + "|" + ip
+		allowed, _ := s.limiter.allow(time.Now().UTC(), key)
+		if !allowed {
+			return nil, rateLimited("too many login attempts")
+		}
+	}
 
 	var userID string
 	var pwHash string
 	err = s.db.QueryRow(ctx, `select id, password_hash from auth_users where email = $1`, email).Scan(&userID, &pwHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			if s.limiter != nil {
+				key := email + "|" + ip
+				s.limiter.onFailure(time.Now().UTC(), key)
+			}
 			return nil, unauth("invalid credentials")
 		}
 		return nil, internal(err)
@@ -132,7 +150,15 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 		return nil, internal(err)
 	}
 	if !ok {
+		if s.limiter != nil {
+			key := email + "|" + ip
+			s.limiter.onFailure(time.Now().UTC(), key)
+		}
 		return nil, unauth("invalid credentials")
+	}
+	if s.limiter != nil {
+		key := email + "|" + ip
+		s.limiter.onSuccess(key)
 	}
 
 	roles, perms, err := s.getRolesAndPermissions(ctx, userID)
@@ -160,7 +186,6 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 	refreshExp := accessNow.Add(s.refreshTTL)
 	absExp := refreshExp
 	refreshHash := security.HashRefreshToken(refresh)
-	ua, ip := clientMetaFromContext(ctx)
 	_, err = s.db.Exec(ctx, `
 		insert into auth_refresh_sessions (token_hash, session_id, user_id, expires_at, absolute_expires_at, user_agent, ip)
 		values ($1,$1,$2,$3,$4,$5,$6)
