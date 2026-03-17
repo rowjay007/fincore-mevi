@@ -67,3 +67,80 @@ func TestUnaryAuthzInterceptor_DeniesWithoutPermission(t *testing.T) {
 		t.Fatalf("expected PermissionDenied, got %v", st.Code())
 	}
 }
+
+func TestUnaryAuthzInterceptor_AllowsWhenNoAuthRequired(t *testing.T) {
+	m := stubMaker{err: security.ErrInvalidToken}
+	interceptor := UnaryAuthzInterceptor(m, map[string]string{"/GetAccount": "account:read"})
+
+	ctx := context.Background()
+	info := &grpc.UnaryServerInfo{FullMethod: "/fincore.account.v1.AccountService/Health"}
+
+	called := false
+	_, err := interceptor(ctx, nil, info, func(ctx context.Context, req any) (any, error) {
+		called = true
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !called {
+		t.Fatalf("expected handler called")
+	}
+}
+
+func TestUnaryAuthzInterceptor_DeniesMissingAuthMetadata(t *testing.T) {
+	m := stubMaker{payload: security.TokenPayload{UserID: "u1", Permissions: []string{"account:read"}, IssuedAt: time.Now(), ExpiredAt: time.Now().Add(time.Minute)}}
+	interceptor := UnaryAuthzInterceptor(m, map[string]string{"/GetAccount": "account:read"})
+
+	ctx := context.Background()
+	info := &grpc.UnaryServerInfo{FullMethod: "/fincore.account.v1.AccountService/GetAccount"}
+
+	_, err := interceptor(ctx, nil, info, func(ctx context.Context, req any) (any, error) {
+		return "ok", nil
+	})
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unauthenticated {
+		t.Fatalf("expected Unauthenticated, got %v", st.Code())
+	}
+}
+
+func TestUnaryAuthzInterceptor_DeniesInvalidAuthorizationFormat(t *testing.T) {
+	m := stubMaker{payload: security.TokenPayload{UserID: "u1", Permissions: []string{"account:read"}, IssuedAt: time.Now(), ExpiredAt: time.Now().Add(time.Minute)}}
+	interceptor := UnaryAuthzInterceptor(m, map[string]string{"/GetAccount": "account:read"})
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Token abc"))
+	info := &grpc.UnaryServerInfo{FullMethod: "/fincore.account.v1.AccountService/GetAccount"}
+
+	_, err := interceptor(ctx, nil, info, func(ctx context.Context, req any) (any, error) {
+		return "ok", nil
+	})
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unauthenticated {
+		t.Fatalf("expected Unauthenticated, got %v", st.Code())
+	}
+}
+
+func TestUnaryAuthzInterceptor_DeniesInvalidToken(t *testing.T) {
+	m := stubMaker{err: security.ErrInvalidToken}
+	interceptor := UnaryAuthzInterceptor(m, map[string]string{"/GetAccount": "account:read"})
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token"))
+	info := &grpc.UnaryServerInfo{FullMethod: "/fincore.account.v1.AccountService/GetAccount"}
+
+	_, err := interceptor(ctx, nil, info, func(ctx context.Context, req any) (any, error) {
+		return "ok", nil
+	})
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected status error, got %v", err)
+	}
+	if st.Code() != codes.Unauthenticated {
+		t.Fatalf("expected Unauthenticated, got %v", st.Code())
+	}
+}
