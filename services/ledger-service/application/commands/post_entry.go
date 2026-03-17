@@ -99,6 +99,11 @@ func (h *PostEntryHandler) Handle(ctx context.Context, cmd PostEntry) (*PostEntr
 		if err := es.Append(ctx, toAppend); err != nil {
 			return err
 		}
+		if entry.Version()%50 == 0 {
+			if err := saveSnapshot(ctx, es, entry); err != nil {
+				return err
+			}
+		}
 		if err := bal.ApplyDelta(ctx, cmd.AccountID.String(), delta); err != nil {
 			return err
 		}
@@ -107,11 +112,11 @@ func (h *PostEntryHandler) Handle(ctx context.Context, cmd PostEntry) (*PostEntr
 		}
 
 		payload, err := json.Marshal(map[string]any{
-			"event_type":     "ledger.entry_posted.v1",
-			"aggregate_id":   entry.ID().String(),
-			"aggregate_type": "ledger_entry",
-			"account_id":     cmd.AccountID.String(),
-			"delta_kobo":     delta,
+			"event_type":      "ledger.entry_posted.v1",
+			"aggregate_id":    entry.ID().String(),
+			"aggregate_type":  "ledger_entry",
+			"account_id":      cmd.AccountID.String(),
+			"delta_kobo":      delta,
 			"occurred_at_utc": entry.OccurredAtUTC(),
 		})
 		if err != nil {
@@ -135,6 +140,21 @@ func (h *PostEntryHandler) Handle(ctx context.Context, cmd PostEntry) (*PostEntr
 		return nil, returnErr
 	}
 	return res, nil
+}
+
+func saveSnapshot(ctx context.Context, es ports.LedgerEventStore, entry *domain.Entry) error {
+	s := entry.Snapshot()
+	b, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	return es.SaveSnapshot(ctx, eventstore.Snapshot{
+		AggregateID:   entry.ID().String(),
+		AggregateType: "ledger_entry",
+		Version:       s.Version,
+		CreatedAt:     time.Now().UTC(),
+		Data:          b,
+	})
 }
 
 func validateMoney(m money.Money) error {

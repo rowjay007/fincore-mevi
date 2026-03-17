@@ -26,6 +26,17 @@ type Entry struct {
 	changes       []Event
 }
 
+type Snapshot struct {
+	EntryID       ids.ID
+	AccountID     ids.ID
+	EntryType     EntryType
+	AmountKobo    int64
+	Currency      string
+	Narration     string
+	OccurredAtUTC time.Time
+	Version       int64
+}
+
 func NewEntry(accountID ids.ID, typ EntryType, amt money.Money, narration string, occurredAtUTC time.Time) (*Entry, error) {
 	if accountID == "" {
 		return nil, errors.New("account id required")
@@ -62,6 +73,19 @@ func (e *Entry) PullChanges() []Event {
 	return out
 }
 
+func (e *Entry) Snapshot() Snapshot {
+	return Snapshot{
+		EntryID:       e.id,
+		AccountID:     e.accountID,
+		EntryType:     e.entryType,
+		AmountKobo:    e.amount.AmountKobo(),
+		Currency:      string(e.amount.Currency()),
+		Narration:     e.narration,
+		OccurredAtUTC: e.occurredAtUTC,
+		Version:       e.version,
+	}
+}
+
 func (e *Entry) raise(ev Event) {
 	e.changes = append(e.changes, ev)
 	e.apply(ev)
@@ -88,4 +112,31 @@ func validateAmount(amt money.Money) error {
 		return ErrInvalidAmount
 	}
 	return nil
+}
+
+func Rehydrate(events []Event) (*Entry, error) {
+	e := &Entry{}
+	for _, ev := range events {
+		e.apply(ev)
+		e.version++
+	}
+	return e, nil
+}
+
+func RehydrateFromSnapshot(s Snapshot, events []Event) (*Entry, error) {
+	amt := money.MustNew(s.AmountKobo, money.Currency(s.Currency))
+	e := &Entry{
+		id:            s.EntryID,
+		accountID:     s.AccountID,
+		entryType:     s.EntryType,
+		amount:        amt,
+		narration:     s.Narration,
+		occurredAtUTC: s.OccurredAtUTC,
+		version:       s.Version,
+	}
+	for _, ev := range events {
+		e.apply(ev)
+		e.version++
+	}
+	return e, nil
 }
