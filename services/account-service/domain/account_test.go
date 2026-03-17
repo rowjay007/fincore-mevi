@@ -1,8 +1,8 @@
 package domain
 
 import (
-	"testing"
 	"fincore/pkg/ids"
+	"testing"
 )
 
 func TestNewAccount(t *testing.T) {

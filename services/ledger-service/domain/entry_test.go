@@ -1,17 +1,17 @@
 package domain
 
 import (
-	"testing"
-	"time"
 	"fincore/pkg/ids"
 	"fincore/pkg/money"
+	"testing"
+	"time"
 )
 
 func TestNewEntry_Valid(t *testing.T) {
 	accountID := ids.New()
 	amt := money.MustNew(1000, money.NGN)
 	narration := "Test deposit"
-	
+
 	entry, err := NewEntry(accountID, EntryTypeDeposit, amt, narration, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("failed to create entry: %v", err)

@@ -14,7 +14,7 @@ type MoneyDeposited struct {
 	OccurredAt time.Time
 }
 
-func (e MoneyDeposited) EventType() string         { return "account.money_deposited.v1" }
+func (e MoneyDeposited) EventType() string        { return "account.money_deposited.v1" }
 func (e MoneyDeposited) OccurredAtUTC() time.Time { return e.OccurredAt }
 
 type MoneyWithdrawn struct {
@@ -24,5 +24,5 @@ type MoneyWithdrawn struct {
 	OccurredAt time.Time
 }
 
-func (e MoneyWithdrawn) EventType() string         { return "account.money_withdrawn.v1" }
+func (e MoneyWithdrawn) EventType() string        { return "account.money_withdrawn.v1" }
 func (e MoneyWithdrawn) OccurredAtUTC() time.Time { return e.OccurredAt }

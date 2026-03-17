@@ -17,7 +17,7 @@ type AccountOpened struct {
 	OccurredAt time.Time
 }
 
-func (e AccountOpened) EventType() string         { return "account.opened.v1" }
+func (e AccountOpened) EventType() string        { return "account.opened.v1" }
 func (e AccountOpened) OccurredAtUTC() time.Time { return e.OccurredAt }
 
 type AccountFrozen struct {
@@ -25,7 +25,7 @@ type AccountFrozen struct {
 	OccurredAt time.Time
 }
 
-func (e AccountFrozen) EventType() string         { return "account.frozen.v1" }
+func (e AccountFrozen) EventType() string        { return "account.frozen.v1" }
 func (e AccountFrozen) OccurredAtUTC() time.Time { return e.OccurredAt }
 
 type AccountClosed struct {
@@ -33,5 +33,5 @@ type AccountClosed struct {
 	OccurredAt time.Time
 }
 
-func (e AccountClosed) EventType() string         { return "account.closed.v1" }
+func (e AccountClosed) EventType() string        { return "account.closed.v1" }
 func (e AccountClosed) OccurredAtUTC() time.Time { return e.OccurredAt }

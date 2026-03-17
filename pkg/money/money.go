@@ -30,7 +30,7 @@ func MustNew(amountKobo int64, currency Currency) Money {
 	return m
 }
 
-func (m Money) AmountKobo() int64 { return m.amountKobo }
+func (m Money) AmountKobo() int64  { return m.amountKobo }
 func (m Money) Currency() Currency { return m.currency }
 
 func (m Money) Add(x Money) (Money, error) {
@@ -47,6 +47,6 @@ func (m Money) Sub(x Money) (Money, error) {
 	return Money{amountKobo: m.amountKobo - x.amountKobo, currency: m.currency}, nil
 }
 
-func (m Money) IsZero() bool { return m.amountKobo == 0 }
-func (m Money) IsNegative() bool { return m.amountKobo < 0 }
+func (m Money) IsZero() bool           { return m.amountKobo == 0 }
+func (m Money) IsNegative() bool       { return m.amountKobo < 0 }
 func (m Money) IsNegativeOrZero() bool { return m.amountKobo <= 0 }
