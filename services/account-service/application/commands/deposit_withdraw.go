@@ -69,7 +69,7 @@ func (h *DepositMoneyHandler) Handle(ctx context.Context, cmd DepositMoney) (*De
 	}
 
 	var res *DepositWithdrawResult
-	err = h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error {
+	err = h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore, proj ports.AccountProjectionRepository) error {
 		ag, err := LoadAccount(ctx, es, cmd.AccountID)
 		if err != nil {
 			return err
@@ -100,6 +100,14 @@ func (h *DepositMoneyHandler) Handle(ctx context.Context, cmd DepositMoney) (*De
 			if err := saveSnapshot(ctx, es, ag, cmd.AccountID); err != nil {
 				return err
 			}
+		}
+		if err := proj.Upsert(ctx, ports.AccountProjection{
+			AccountID:  cmd.AccountID.String(),
+			CustomerID: ag.CustomerID().String(),
+			Status:     string(ag.Status()),
+			Version:    ver,
+		}); err != nil {
+			return err
 		}
 
 		payload, err := json.Marshal(outboxEventEnvelope{
@@ -150,7 +158,7 @@ func (h *WithdrawMoneyHandler) Handle(ctx context.Context, cmd WithdrawMoney) (*
 	}
 
 	var res *DepositWithdrawResult
-	err = h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error {
+	err = h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore, proj ports.AccountProjectionRepository) error {
 		ag, err := LoadAccount(ctx, es, cmd.AccountID)
 		if err != nil {
 			return err
@@ -181,6 +189,14 @@ func (h *WithdrawMoneyHandler) Handle(ctx context.Context, cmd WithdrawMoney) (*
 			if err := saveSnapshot(ctx, es, ag, cmd.AccountID); err != nil {
 				return err
 			}
+		}
+		if err := proj.Upsert(ctx, ports.AccountProjection{
+			AccountID:  cmd.AccountID.String(),
+			CustomerID: ag.CustomerID().String(),
+			Status:     string(ag.Status()),
+			Version:    ver,
+		}); err != nil {
+			return err
 		}
 
 		payload, err := json.Marshal(outboxEventEnvelope{

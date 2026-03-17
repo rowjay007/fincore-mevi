@@ -18,7 +18,7 @@ func NewUnitOfWork(pool *pgxpool.Pool) *UnitOfWork {
 	return &UnitOfWork{pool: pool}
 }
 
-func (u *UnitOfWork) WithTx(ctx context.Context, fn func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error) error {
+func (u *UnitOfWork) WithTx(ctx context.Context, fn func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore, proj ports.AccountProjectionRepository) error) error {
 	tx, err := u.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -29,8 +29,9 @@ func (u *UnitOfWork) WithTx(ctx context.Context, fn func(ctx context.Context, es
 
 	es := espg.New(tx)
 	obStore := obpg.New(tx)
+	proj := NewAccountProjectionRepo(tx)
 
-	if err := fn(ctx, es, obStore); err != nil {
+	if err := fn(ctx, es, obStore, proj); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

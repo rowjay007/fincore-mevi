@@ -98,13 +98,16 @@ func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountReques
 
 	var customerID string
 	var status string
-	err := s.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error {
-		acc, err := commands.LoadAccount(ctx, es, ids.ID(req.AccountId))
+	err := s.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore, proj ports.AccountProjectionRepository) error {
+		p, ok, err := proj.GetByID(ctx, req.AccountId)
 		if err != nil {
 			return err
 		}
-		customerID = acc.CustomerID().String()
-		status = string(acc.Status())
+		if !ok {
+			return errors.New("account not found")
+		}
+		customerID = p.CustomerID
+		status = p.Status
 		return nil
 	})
 	if err != nil {

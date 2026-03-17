@@ -43,7 +43,7 @@ func (h *OpenAccountHandler) Handle(ctx context.Context, cmd OpenAccount) (*Open
 	}
 
 	var res *OpenAccountResult
-	err := h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error {
+	err := h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore, proj ports.AccountProjectionRepository) error {
 		ag, err := domain.NewAccount(cmd.CustomerID)
 		if err != nil {
 			return err
@@ -100,6 +100,14 @@ func (h *OpenAccountHandler) Handle(ctx context.Context, cmd OpenAccount) (*Open
 		}
 		if err := es.Append(ctx, toAppend); err != nil {
 			return fmt.Errorf("append events: %w", err)
+		}
+		if err := proj.Upsert(ctx, ports.AccountProjection{
+			AccountID:  ag.ID().String(),
+			CustomerID: ag.CustomerID().String(),
+			Status:     string(ag.Status()),
+			Version:    ag.Version(),
+		}); err != nil {
+			return err
 		}
 
 		res = &OpenAccountResult{AccountID: ag.ID(), Version: ag.Version()}
