@@ -145,7 +145,7 @@ func TestTransactionalOutbox_AccountService_CommitAndRelayPublish(t *testing.T) 
 		time.Sleep(20 * time.Millisecond)
 	}
 	rcancel()
-	_ = <-done
+	<-done
 
 	if pub.Calls() < 2 {
 		t.Fatalf("expected relay publish calls >= 2, got %d", pub.Calls())
