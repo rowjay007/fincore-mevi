@@ -10,7 +10,6 @@ import (
 	"fincore/pkg/money"
 	"fincore/services/account-service/application/commands"
 	"fincore/services/account-service/application/ports"
-	"fincore/services/account-service/domain"
 )
 
 type Server struct {
@@ -100,24 +99,7 @@ func (s *Server) GetAccount(ctx context.Context, req *accountv1.GetAccountReques
 	var customerID string
 	var status string
 	err := s.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error {
-		events, err := es.Read(ctx, req.AccountId, 0, 1000)
-		if err != nil {
-			return err
-		}
-		if len(events) == 0 {
-			return errors.New("account not found")
-		}
-
-		var domainEvents []domain.Event
-		for _, e := range events {
-			ev, err := commands.UnmarshalAccountEvent(e.Type, e.Data)
-			if err != nil {
-				return err
-			}
-			domainEvents = append(domainEvents, ev)
-		}
-
-		acc, err := domain.Rehydrate(domainEvents)
+		acc, err := commands.LoadAccount(ctx, es, ids.ID(req.AccountId))
 		if err != nil {
 			return err
 		}

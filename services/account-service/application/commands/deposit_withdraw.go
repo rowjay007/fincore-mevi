@@ -70,7 +70,7 @@ func (h *DepositMoneyHandler) Handle(ctx context.Context, cmd DepositMoney) (*De
 
 	var res *DepositWithdrawResult
 	err = h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error {
-		ag, err := loadAccount(ctx, es, cmd.AccountID)
+		ag, err := LoadAccount(ctx, es, cmd.AccountID)
 		if err != nil {
 			return err
 		}
@@ -95,6 +95,11 @@ func (h *DepositMoneyHandler) Handle(ctx context.Context, cmd DepositMoney) (*De
 			Data:          b,
 		}}); err != nil {
 			return fmt.Errorf("append account event: %w", err)
+		}
+		if ver%50 == 0 {
+			if err := saveSnapshot(ctx, es, ag, cmd.AccountID); err != nil {
+				return err
+			}
 		}
 
 		payload, err := json.Marshal(outboxEventEnvelope{
@@ -146,7 +151,7 @@ func (h *WithdrawMoneyHandler) Handle(ctx context.Context, cmd WithdrawMoney) (*
 
 	var res *DepositWithdrawResult
 	err = h.uow.WithTx(ctx, func(ctx context.Context, es ports.AccountEventStore, ob ports.OutboxStore) error {
-		ag, err := loadAccount(ctx, es, cmd.AccountID)
+		ag, err := LoadAccount(ctx, es, cmd.AccountID)
 		if err != nil {
 			return err
 		}
@@ -171,6 +176,11 @@ func (h *WithdrawMoneyHandler) Handle(ctx context.Context, cmd WithdrawMoney) (*
 			Data:          b,
 		}}); err != nil {
 			return fmt.Errorf("append account event: %w", err)
+		}
+		if ver%50 == 0 {
+			if err := saveSnapshot(ctx, es, ag, cmd.AccountID); err != nil {
+				return err
+			}
 		}
 
 		payload, err := json.Marshal(outboxEventEnvelope{
@@ -204,8 +214,24 @@ func (h *WithdrawMoneyHandler) Handle(ctx context.Context, cmd WithdrawMoney) (*
 	return res, nil
 }
 
-func loadAccount(ctx context.Context, es ports.AccountEventStore, accountID ids.ID) (*domain.Account, error) {
-	events, err := es.Read(ctx, accountID.String(), 0, 10000)
+func LoadAccount(ctx context.Context, es ports.AccountEventStore, accountID ids.ID) (*domain.Account, error) {
+	fromVer := int64(0)
+	var snap *eventstore.Snapshot
+	var snapState *domain.Snapshot
+	var err error
+	snap, err = es.LoadLatestSnapshot(ctx, accountID.String())
+	if err != nil {
+		return nil, err
+	}
+	if snap != nil {
+		var s domain.Snapshot
+		if err := json.Unmarshal(snap.Data, &s); err != nil {
+			return nil, err
+		}
+		snapState = &s
+		fromVer = snap.Version
+	}
+	events, err := es.Read(ctx, accountID.String(), fromVer, 10000)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +243,25 @@ func loadAccount(ctx context.Context, es ports.AccountEventStore, accountID ids.
 		}
 		des = append(des, ev)
 	}
+	if snapState != nil {
+		return domain.RehydrateFromSnapshot(*snapState, des)
+	}
 	return domain.Rehydrate(des)
+}
+
+func saveSnapshot(ctx context.Context, es ports.AccountEventStore, ag *domain.Account, aggregateID ids.ID) error {
+	s := ag.Snapshot()
+	b, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	return es.SaveSnapshot(ctx, eventstore.Snapshot{
+		AggregateID:   aggregateID.String(),
+		AggregateType: "account",
+		Version:       s.Version,
+		CreatedAt:     time.Now().UTC(),
+		Data:          b,
+	})
 }
 
 func UnmarshalAccountEvent(typ string, data []byte) (domain.Event, error) {

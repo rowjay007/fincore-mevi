@@ -9,6 +9,7 @@ import (
 
 type AccountEventStore interface {
 	eventstore.Store
+	eventstore.SnapshotStore
 }
 
 type OutboxStore interface {

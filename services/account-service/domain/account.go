@@ -34,6 +34,13 @@ type Account struct {
 	changes    []Event
 }
 
+type Snapshot struct {
+	AccountID  ids.ID
+	CustomerID ids.ID
+	Status     Status
+	Version    int64
+}
+
 func NewAccount(customerID ids.ID) (*Account, error) {
 	if customerID == "" {
 		return nil, errors.New("customer id required")
@@ -90,6 +97,10 @@ func (a *Account) PullChanges() []Event {
 	return out
 }
 
+func (a *Account) Snapshot() Snapshot {
+	return Snapshot{AccountID: a.id, CustomerID: a.customerID, Status: a.status, Version: a.version}
+}
+
 func (a *Account) raise(e Event) {
 	a.changes = append(a.changes, e)
 	a.apply(e)
@@ -115,6 +126,15 @@ func (a *Account) apply(e Event) {
 
 func Rehydrate(events []Event) (*Account, error) {
 	a := &Account{}
+	for _, e := range events {
+		a.apply(e)
+		a.version++
+	}
+	return a, nil
+}
+
+func RehydrateFromSnapshot(s Snapshot, events []Event) (*Account, error) {
+	a := &Account{id: s.AccountID, customerID: s.CustomerID, status: s.Status, version: s.Version}
 	for _, e := range events {
 		a.apply(e)
 		a.version++
