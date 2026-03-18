@@ -31,6 +31,8 @@ export VAULT_ADDR=http://localhost:8200
 export VAULT_TOKEN=root
 ```
 
+If you are using Vault Agent, you can avoid exporting `VAULT_TOKEN` and instead set `VAULT_TOKEN_FILE`. See `docs/vault-agent-autoauth.md`.
+
 Create an example KV secret (v2):
 
 ```bash
@@ -54,7 +56,8 @@ This allows running `identity-service` without embedding JWT signing keys in pro
 
 `identity-service` will only attempt to read Vault when:
 
-- `VAULT_ADDR` and `VAULT_TOKEN` are set
+- `VAULT_ADDR` is set
+- AND either `VAULT_TOKEN` or `VAULT_TOKEN_FILE` is set
 - AND `IDENTITY_JWT_KID` / `IDENTITY_JWT_ED25519_PRIVATE_KEY` are not set
 
 Environment variables:
@@ -62,6 +65,7 @@ Environment variables:
 ```bash
 export VAULT_ADDR=http://localhost:8200
 export VAULT_TOKEN=root
+export VAULT_TOKEN_FILE=/vault/agent/token
 export VAULT_KV_MOUNT=secret
 export VAULT_IDENTITY_JWT_SECRET_PATH=identity
 ```

@@ -74,8 +74,11 @@ type vaultIdentityJWTSecret struct {
 
 func maybeLoadIdentityJWTFromVault(ctx context.Context) (vaultIdentityJWTSecret, bool, error) {
 	addr := strings.TrimSpace(os.Getenv("VAULT_ADDR"))
-	token := strings.TrimSpace(os.Getenv("VAULT_TOKEN"))
-	if addr == "" || token == "" {
+	token, ok, err := secrets.VaultTokenFromEnvOrFile()
+	if err != nil {
+		return vaultIdentityJWTSecret{}, false, err
+	}
+	if addr == "" || !ok {
 		return vaultIdentityJWTSecret{}, false, nil
 	}
 
