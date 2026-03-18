@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -15,6 +16,7 @@ import (
 	accountv1 "fincore/gen/go/account/v1"
 	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/postgres"
+	"fincore/pkg/secrets"
 	"fincore/pkg/security"
 	"fincore/pkg/security/middleware"
 	"fincore/services/account-service/application/commands"
@@ -22,12 +24,55 @@ import (
 	accountpg "fincore/services/account-service/infrastructure/postgres"
 )
 
+func maybeLoadAccountDBDSNFromVault(ctx context.Context) (string, bool, error) {
+	addr := strings.TrimSpace(os.Getenv("VAULT_ADDR"))
+	token, ok, err := secrets.VaultTokenFromEnvOrFile()
+	if err != nil {
+		return "", false, err
+	}
+	if addr == "" || !ok {
+		return "", false, nil
+	}
+
+	mount := strings.TrimSpace(os.Getenv("VAULT_KV_MOUNT"))
+	if mount == "" {
+		mount = "secret"
+	}
+	secretPath := strings.TrimSpace(os.Getenv("VAULT_ACCOUNT_DB_DSN_SECRET_PATH"))
+	if secretPath == "" {
+		secretPath = "account"
+	}
+
+	c, err := secrets.NewVaultKVClient(secrets.VaultKVClientConfig{Addr: addr, Token: token, KVV2Mount: mount})
+	if err != nil {
+		return "", false, err
+	}
+	data, err := c.ReadKVV2(ctx, secretPath)
+	if err != nil {
+		return "", false, err
+	}
+
+	dsn, _ := data["dsn"].(string)
+	if strings.TrimSpace(dsn) == "" {
+		return "", false, nil
+	}
+	return dsn, true, nil
+}
+
 func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	dsn := os.Getenv("ACCOUNT_DB_DSN")
+	if strings.TrimSpace(dsn) == "" {
+		if v, ok, err := maybeLoadAccountDBDSNFromVault(ctx); err != nil {
+			log.Fatalf("failed to load account db dsn from vault: %v", err)
+		} else if ok {
+			dsn = v
+			log.Printf("loaded account db dsn from vault")
+		}
+	}
 	ledgerAddr := os.Getenv("LEDGER_ADDR")
 	grpcAddr := os.Getenv("ACCOUNT_GRPC_ADDR")
 	if grpcAddr == "" {

@@ -6,10 +6,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	ledgerv1 "fincore/gen/go/ledger/v1"
 	"fincore/pkg/postgres"
+	"fincore/pkg/secrets"
 	"fincore/pkg/security"
 	"fincore/pkg/security/middleware"
 	"fincore/services/ledger-service/application/commands"
@@ -22,10 +24,53 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+func maybeLoadLedgerDBDSNFromVault(ctx context.Context) (string, bool, error) {
+	addr := strings.TrimSpace(os.Getenv("VAULT_ADDR"))
+	token, ok, err := secrets.VaultTokenFromEnvOrFile()
+	if err != nil {
+		return "", false, err
+	}
+	if addr == "" || !ok {
+		return "", false, nil
+	}
+
+	mount := strings.TrimSpace(os.Getenv("VAULT_KV_MOUNT"))
+	if mount == "" {
+		mount = "secret"
+	}
+	secretPath := strings.TrimSpace(os.Getenv("VAULT_LEDGER_DB_DSN_SECRET_PATH"))
+	if secretPath == "" {
+		secretPath = "ledger"
+	}
+
+	c, err := secrets.NewVaultKVClient(secrets.VaultKVClientConfig{Addr: addr, Token: token, KVV2Mount: mount})
+	if err != nil {
+		return "", false, err
+	}
+	data, err := c.ReadKVV2(ctx, secretPath)
+	if err != nil {
+		return "", false, err
+	}
+
+	dsn, _ := data["dsn"].(string)
+	if strings.TrimSpace(dsn) == "" {
+		return "", false, nil
+	}
+	return dsn, true, nil
+}
+
 func main() {
 	ctx := context.Background()
 
 	dsn := os.Getenv("LEDGER_DB_DSN")
+	if strings.TrimSpace(dsn) == "" {
+		if v, ok, err := maybeLoadLedgerDBDSNFromVault(ctx); err != nil {
+			log.Fatalf("failed to load ledger db dsn from vault: %v", err)
+		} else if ok {
+			dsn = v
+			log.Printf("loaded ledger db dsn from vault")
+		}
+	}
 	addr := os.Getenv("LEDGER_LISTEN_ADDR")
 	if addr == "" {
 		addr = ":50053"
