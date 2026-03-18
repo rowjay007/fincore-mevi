@@ -62,7 +62,14 @@ func main() {
 		"/GetBalance": "ledger:read",
 	})
 
-	s := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))
+	serverOpts := []grpc.ServerOption{grpc.UnaryInterceptor(authInterceptor)}
+	if creds, closeSrc, err := security.NewSpiffeMTLSServerCredentials(ctx); err == nil {
+		defer closeSrc()
+		serverOpts = append(serverOpts, grpc.Creds(creds))
+		log.Printf("SPIFFE mTLS enabled for gRPC server")
+	}
+
+	s := grpc.NewServer(serverOpts...)
 	ledgerv1.RegisterLedgerServiceServer(s, ledgergrpc.NewServer(post, balQuery))
 
 	go func() {

@@ -52,7 +52,13 @@ func main() {
 	defer pool.Close()
 
 	// 2. Ledger Client (Sync gRPC)
-	lconn, err := grpc.NewClient(ledgerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
+	if creds, closeSrc, err := security.NewSpiffeMTLSClientCredentials(ctx); err == nil {
+		defer closeSrc()
+		dialCreds = grpc.WithTransportCredentials(creds)
+		log.Printf("SPIFFE mTLS enabled for ledger dial")
+	}
+	lconn, err := grpc.NewClient(ledgerAddr, dialCreds)
 	if err != nil {
 		log.Fatalf("failed to connect to ledger: %v", err)
 	}
