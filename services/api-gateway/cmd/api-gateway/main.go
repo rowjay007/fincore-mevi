@@ -95,6 +95,20 @@ func withRateLimit(l *rateLimiter, next http.Handler) http.Handler {
 	})
 }
 
+func withRateLimitByPath(defaultLimiter *rateLimiter, strictLimiter *rateLimiter, strictPrefixes []string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lim := defaultLimiter
+		path := r.URL.Path
+		for _, p := range strictPrefixes {
+			if p != "" && strings.HasPrefix(path, p) {
+				lim = strictLimiter
+				break
+			}
+		}
+		withRateLimit(lim, next).ServeHTTP(w, r)
+	})
+}
+
 func stripUntrustedIdentityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Del("X-Fincore-Subject")
@@ -147,7 +161,7 @@ func withJWTAuth(verifier *security.JWKSVerifier, publicPrefixes []string, next 
 func parsePublicPrefixesEnv() []string {
 	v := strings.TrimSpace(os.Getenv("GATEWAY_PUBLIC_PATH_PREFIXES"))
 	if v == "" {
-		v = "/.well-known,/oauth/,/v1/auth/"
+		v = "/.well-known,/oauth/,/v1/auth/register,/v1/auth/login,/v1/auth/refresh,/v1/auth/logout,/v1/auth/logout_all"
 	}
 	parts := strings.Split(v, ",")
 	out := make([]string, 0, len(parts))
@@ -274,11 +288,13 @@ func main() {
 
 	publicPrefixes := parsePublicPrefixesEnv()
 	lim := newRateLimiter(20, 40)
+	strict := newRateLimiter(5, 10)
+	strictPrefixes := []string{"/oauth/token", "/v1/auth/login", "/v1/auth/register"}
 
 	h := http.Handler(proxy)
 	h = stripUntrustedIdentityHeaders(h)
 	h = withJWTAuth(verifier, publicPrefixes, h)
-	h = withRateLimit(lim, h)
+	h = withRateLimitByPath(lim, strict, strictPrefixes, h)
 
 	log.Printf("Starting api-gateway on %s", httpAddr)
 	if err := http.ListenAndServe(httpAddr, h); err != nil {
