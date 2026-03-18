@@ -34,6 +34,59 @@ func spiffeTrustDomain() (spiffeid.TrustDomain, error) {
 	return spiffeid.TrustDomainFromString(v)
 }
 
+func spiffeAllowedIDsFromEnv(key string) ([]spiffeid.ID, bool, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return nil, false, nil
+	}
+
+	parts := strings.Split(raw, ",")
+	ids := make([]spiffeid.ID, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		id, err := spiffeid.FromString(p)
+		if err != nil {
+			return nil, false, err
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, false, nil
+	}
+	return ids, true, nil
+}
+
+func spiffeClientAuthorizer() (tlsconfig.Authorizer, error) {
+	if ids, ok, err := spiffeAllowedIDsFromEnv("SPIFFE_MTLS_CLIENT_ALLOWED_SVIDS"); err != nil {
+		return nil, err
+	} else if ok {
+		return tlsconfig.AuthorizeOneOf(ids...), nil
+	}
+
+	trustDomain, err := spiffeTrustDomain()
+	if err != nil {
+		return nil, err
+	}
+	return tlsconfig.AuthorizeMemberOf(trustDomain), nil
+}
+
+func spiffeServerAuthorizer() (tlsconfig.Authorizer, error) {
+	if ids, ok, err := spiffeAllowedIDsFromEnv("SPIFFE_MTLS_SERVER_ALLOWED_SVIDS"); err != nil {
+		return nil, err
+	} else if ok {
+		return tlsconfig.AuthorizeOneOf(ids...), nil
+	}
+
+	trustDomain, err := spiffeTrustDomain()
+	if err != nil {
+		return nil, err
+	}
+	return tlsconfig.AuthorizeMemberOf(trustDomain), nil
+}
+
 func NewSpiffeMTLSClientCredentials(ctx context.Context) (credentials.TransportCredentials, func(), error) {
 	if !spiffeMTLSEnabled() {
 		return nil, func() {}, errors.New("spiffe mtls not enabled")
@@ -44,12 +97,11 @@ func NewSpiffeMTLSClientCredentials(ctx context.Context) (credentials.TransportC
 		return nil, func() {}, err
 	}
 
-	trustDomain, err := spiffeTrustDomain()
+	authorizer, err := spiffeClientAuthorizer()
 	if err != nil {
 		source.Close()
 		return nil, func() {}, err
 	}
-	authorizer := tlsconfig.AuthorizeMemberOf(trustDomain)
 	tlsCfg := tlsconfig.MTLSClientConfig(source, source, authorizer)
 	tlsCfg.MinVersion = tls.VersionTLS12
 
@@ -67,12 +119,11 @@ func NewSpiffeMTLSServerCredentials(ctx context.Context) (credentials.TransportC
 		return nil, func() {}, err
 	}
 
-	trustDomain, err := spiffeTrustDomain()
+	authorizer, err := spiffeServerAuthorizer()
 	if err != nil {
 		source.Close()
 		return nil, func() {}, err
 	}
-	authorizer := tlsconfig.AuthorizeMemberOf(trustDomain)
 	tlsCfg := tlsconfig.MTLSServerConfig(source, source, authorizer)
 	tlsCfg.MinVersion = tls.VersionTLS12
 

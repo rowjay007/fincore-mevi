@@ -57,3 +57,20 @@ Once service containers exist with labels and the agent is running on the same D
 - **Direct gRPC mTLS**: use SPIFFE TLS (go-spiffe) to create `grpc.Creds` from the Workload API socket.
 - **Envoy sidecars**: use SDS + Workload API socket to provision certs.
 - **Istio**: move to Kubernetes and use Istio + SPIRE integration for SPIFFE identities.
+
+## mTLS authorization hardening (allowlists)
+
+By default, the in-process SPIFFE mTLS helper authorizes any peer in the configured trust domain.
+
+You can optionally enable **least-privilege** by setting allowlists:
+
+```bash
+export SPIFFE_MTLS_CLIENT_ALLOWED_SVIDS=spiffe://fincore.local/ns/default/sa/ledger-service
+export SPIFFE_MTLS_SERVER_ALLOWED_SVIDS=spiffe://fincore.local/ns/default/sa/account-service
+```
+
+Notes:
+
+- `SPIFFE_MTLS_CLIENT_ALLOWED_SVIDS` controls which server SVID(s) the client will accept.
+- `SPIFFE_MTLS_SERVER_ALLOWED_SVIDS` controls which client SVID(s) the server will accept.
+- Values are comma-separated SPIFFE IDs.
