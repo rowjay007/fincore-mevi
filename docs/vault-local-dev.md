@@ -44,6 +44,33 @@ Read it back:
 vault kv get secret/identity
 ```
 
+## Identity-service wiring (opt-in)
+
+### Reason (why)
+
+This allows running `identity-service` without embedding JWT signing keys in process environment variables, while keeping the default env-var flow intact.
+
+### Usage (how)
+
+`identity-service` will only attempt to read Vault when:
+
+- `VAULT_ADDR` and `VAULT_TOKEN` are set
+- AND `IDENTITY_JWT_KID` / `IDENTITY_JWT_ED25519_PRIVATE_KEY` are not set
+
+Environment variables:
+
+```bash
+export VAULT_ADDR=http://localhost:8200
+export VAULT_TOKEN=root
+export VAULT_KV_MOUNT=secret
+export VAULT_IDENTITY_JWT_SECRET_PATH=identity
+```
+
+Expected Vault KV v2 fields at `secret/data/identity`:
+
+- `kid`
+- `jwt_ed25519_private_key`
+
 ## Next step (not implemented yet)
 
 - Enable Vault Kubernetes auth (or Vault Agent) in cluster.

@@ -19,6 +19,7 @@ import (
 
 	authv1 "fincore/gen/go/auth/v1"
 	"fincore/pkg/postgres"
+	"fincore/pkg/secrets"
 	"fincore/pkg/security"
 	"fincore/pkg/security/middleware"
 	authgrpc "fincore/services/auth-service/infrastructure/grpc"
@@ -66,6 +67,44 @@ func getenvAny(keys ...string) string {
 	return ""
 }
 
+type vaultIdentityJWTSecret struct {
+	Kid               string
+	Ed25519PrivateKey string
+}
+
+func maybeLoadIdentityJWTFromVault(ctx context.Context) (vaultIdentityJWTSecret, bool, error) {
+	addr := strings.TrimSpace(os.Getenv("VAULT_ADDR"))
+	token := strings.TrimSpace(os.Getenv("VAULT_TOKEN"))
+	if addr == "" || token == "" {
+		return vaultIdentityJWTSecret{}, false, nil
+	}
+
+	mount := strings.TrimSpace(os.Getenv("VAULT_KV_MOUNT"))
+	if mount == "" {
+		mount = "secret"
+	}
+	secretPath := strings.TrimSpace(os.Getenv("VAULT_IDENTITY_JWT_SECRET_PATH"))
+	if secretPath == "" {
+		secretPath = "identity"
+	}
+
+	c, err := secrets.NewVaultKVClient(secrets.VaultKVClientConfig{Addr: addr, Token: token, KVV2Mount: mount})
+	if err != nil {
+		return vaultIdentityJWTSecret{}, false, err
+	}
+	data, err := c.ReadKVV2(ctx, secretPath)
+	if err != nil {
+		return vaultIdentityJWTSecret{}, false, err
+	}
+
+	kid, _ := data["kid"].(string)
+	priv, _ := data["jwt_ed25519_private_key"].(string)
+	if strings.TrimSpace(kid) == "" || strings.TrimSpace(priv) == "" {
+		return vaultIdentityJWTSecret{}, false, nil
+	}
+	return vaultIdentityJWTSecret{Kid: kid, Ed25519PrivateKey: priv}, true, nil
+}
+
 func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -74,6 +113,19 @@ func main() {
 	dsn := getenvAny("IDENTITY_DB_DSN", "AUTH_DB_DSN")
 	jwtKid := getenvAny("IDENTITY_JWT_KID", "AUTH_JWT_KID")
 	jwtEd25519Priv := getenvAny("IDENTITY_JWT_ED25519_PRIVATE_KEY", "AUTH_JWT_ED25519_PRIVATE_KEY")
+	if jwtKid == "" || jwtEd25519Priv == "" {
+		if v, ok, err := maybeLoadIdentityJWTFromVault(ctx); err != nil {
+			log.Fatalf("failed to load identity jwt secret from vault: %v", err)
+		} else if ok {
+			if jwtKid == "" {
+				jwtKid = v.Kid
+			}
+			if jwtEd25519Priv == "" {
+				jwtEd25519Priv = v.Ed25519PrivateKey
+			}
+			log.Printf("loaded identity jwt signing material from vault")
+		}
+	}
 	if strings.TrimSpace(dsn) == "" {
 		log.Fatalf("IDENTITY_DB_DSN (or AUTH_DB_DSN) is required")
 	}
