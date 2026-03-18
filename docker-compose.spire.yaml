@@ -3,7 +3,7 @@ services:
     image: ghcr.io/spiffe/spire-server:1.9.6
     command: [ "-config", "/run/spire/server/server.conf" ]
     volumes:
-      - ./infra/spire/server:/run/spire/server
+      - ./.dev/spire/server:/run/spire/server
       - spire-data:/run/spire/data
       - spire-sockets:/run/spire/sockets
     ports:
@@ -11,7 +11,8 @@ services:
 
   spire-agent:
     image: ghcr.io/spiffe/spire-agent:1.9.6
-    command: [ "-config", "/run/spire/agent/agent.conf" ]
+    entrypoint: [ "/opt/spire/bin/spire-agent" ]
+    command: [ "run", "-config", "/run/spire/agent/agent.conf" ]
     depends_on:
       - spire-server
     volumes:

@@ -8,11 +8,11 @@ TRUST_DOMAIN=${SPIFFE_TRUST_DOMAIN:-fincore.local}
 
 DEV_DIR=${DEV_DIR:-.dev}
 DEV_SPIRE_AGENT_DIR=${DEV_SPIRE_AGENT_DIR:-${DEV_DIR}/spire/agent}
+DEV_SPIRE_COMPOSE_OVERRIDE=${DEV_SPIRE_COMPOSE_OVERRIDE:-${DEV_DIR}/docker-compose.spire.override.yaml}
 
 ACCOUNT_SVID=${ACCOUNT_SVID:-spiffe://${TRUST_DOMAIN}/ns/default/sa/account-service}
 LEDGER_SVID=${LEDGER_SVID:-spiffe://${TRUST_DOMAIN}/ns/default/sa/ledger-service}
 IDENTITY_SVID=${IDENTITY_SVID:-spiffe://${TRUST_DOMAIN}/ns/default/sa/identity-service}
-AGENT_SVID=${AGENT_SVID:-spiffe://${TRUST_DOMAIN}/spire/agent}
 
 ACCOUNT_SELECTOR=${ACCOUNT_SELECTOR:-docker:label:com.fincore.service:account-service}
 LEDGER_SELECTOR=${LEDGER_SELECTOR:-docker:label:com.fincore.service:ledger-service}
@@ -37,12 +37,12 @@ spire_exec() {
 }
 
 vault_exec() {
-  docker compose -f "${VAULT_COMPOSE_FILE}" exec -T -e VAULT_TOKEN="${VAULT_TOKEN}" vault vault "$@"
+  docker compose -f "${VAULT_COMPOSE_FILE}" exec -T -e VAULT_ADDR="http://127.0.0.1:8200" -e VAULT_TOKEN="${VAULT_TOKEN}" vault vault "$@"
 }
 
 ensure_spire_join_token() {
   local token
-  token=$(spire_exec token generate -spiffeID "${AGENT_SVID}" -ttl 24h -format json | sed -n 's/.*"value"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+  token=$(spire_exec token generate -ttl 86400 -output json | sed -n 's/.*"value"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
   if [[ -z "${token}" ]]; then
     echo "failed to generate spire join token" >&2
     exit 1
@@ -56,19 +56,18 @@ agent {
   server_address = "spire-server"
   server_port = "8080"
   socket_path = "/run/spire/sockets/agent.sock"
+  insecure_bootstrap = true
   trust_domain = "${TRUST_DOMAIN}"
 }
 
 plugins {
   NodeAttestor "join_token" {
-    plugin_data {
-      join_token = "${token}"
-    }
+    plugin_data {}
   }
 
   WorkloadAttestor "docker" {
     plugin_data {
-      docker_socket_path = "/var/run/docker.sock"
+      docker_socket_path = "unix:///var/run/docker.sock"
     }
   }
 
@@ -78,17 +77,59 @@ plugins {
 }
 EOF
 
-  docker compose -f "${SPIRE_COMPOSE_FILE}" restart spire-agent >/dev/null
+	mkdir -p "${DEV_DIR}"
+	cat >"${DEV_SPIRE_COMPOSE_OVERRIDE}" <<EOF
+services:
+  spire-agent:
+    command: ["run", "-config", "/run/spire/agent/agent.conf", "-joinToken", "${token}"]
+EOF
+
+	docker compose -f "${SPIRE_COMPOSE_FILE}" -f "${DEV_SPIRE_COMPOSE_OVERRIDE}" rm -sf spire-agent >/dev/null 2>&1 || true
+	docker compose -f "${SPIRE_COMPOSE_FILE}" -f "${DEV_SPIRE_COMPOSE_OVERRIDE}" up -d --force-recreate spire-agent >/dev/null
+
+	echo "${token}"
+}
+
+wait_for_attested_agent_parent_id() {
+	local timeout_s=${1:-60}
+	local start
+	start=$(date +%s)
+	while true; do
+		local json
+		json=$(spire_exec agent list -output json 2>/dev/null || true)
+		local td
+		td=$(echo "${json}" | sed -n 's/.*"trust_domain"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+		local path
+		path=$(echo "${json}" | sed -n 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+		if [[ -n "${td}" && -n "${path}" ]]; then
+			echo "spiffe://${td}${path}"
+			return 0
+		fi
+		if (( $(date +%s) - start > timeout_s )); then
+			echo "timed out waiting for attested spire agent" >&2
+			return 1
+		fi
+		sleep 1
+	done
 }
 
 spire_entry_exists() {
   local spiffe_id=$1
-  spire_exec entry show -spiffeID "${spiffe_id}" >/dev/null 2>&1
+	local json
+	json=$(spire_exec entry show -spiffeID "${spiffe_id}" -output json 2>/dev/null || true)
+	if echo "${json}" | grep -q '"entries"[[:space:]]*:[[:space:]]*\[\]'; then
+		return 1
+	fi
+	if echo "${json}" | grep -q '"entries"[[:space:]]*:[[:space:]]*\['; then
+		return 0
+	fi
+	return 1
 }
 
 create_spire_entry_if_missing() {
   local spiffe_id=$1
   local selector=$2
+  local parent_id=$3
 
   if spire_entry_exists "${spiffe_id}"; then
     return 0
@@ -96,12 +137,15 @@ create_spire_entry_if_missing() {
 
   spire_exec entry create \
     -spiffeID "${spiffe_id}" \
-    -parentID "${AGENT_SVID}" \
+    -parentID "${parent_id}" \
     -selector "${selector}" >/dev/null
 }
 
 generate_identity_ed25519_priv_b64url() {
-  cat <<'EOF' | go run -
+	local tmpdir
+	tmpdir=$(mktemp -d)
+	trap 'rm -rf "${tmpdir}"' RETURN
+	cat >"${tmpdir}/main.go" <<'EOF'
 package main
 
 import (
@@ -119,6 +163,7 @@ func main() {
 	fmt.Print(base64.RawURLEncoding.EncodeToString(priv))
 }
 EOF
+	go run "${tmpdir}/main.go"
 }
 
 seed_vault_kv() {
@@ -142,11 +187,12 @@ seed_vault_kv() {
 main() {
   ensure_running
 
-  ensure_spire_join_token
+  ensure_spire_join_token >/dev/null
+	parent_id=$(wait_for_attested_agent_parent_id 45)
 
-  create_spire_entry_if_missing "${ACCOUNT_SVID}" "${ACCOUNT_SELECTOR}"
-  create_spire_entry_if_missing "${LEDGER_SVID}" "${LEDGER_SELECTOR}"
-  create_spire_entry_if_missing "${IDENTITY_SVID}" "${IDENTITY_SELECTOR}"
+  create_spire_entry_if_missing "${ACCOUNT_SVID}" "${ACCOUNT_SELECTOR}" "${parent_id}"
+  create_spire_entry_if_missing "${LEDGER_SVID}" "${LEDGER_SELECTOR}" "${parent_id}"
+  create_spire_entry_if_missing "${IDENTITY_SVID}" "${IDENTITY_SELECTOR}" "${parent_id}"
 
   seed_vault_kv
 
