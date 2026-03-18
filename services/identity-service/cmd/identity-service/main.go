@@ -14,6 +14,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	authv1 "fincore/gen/go/auth/v1"
@@ -159,7 +160,14 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	g := grpc.NewServer()
+	serverOpts := []grpc.ServerOption{}
+	if creds, closeSrc, err := security.NewSpiffeMTLSServerCredentials(ctx); err == nil {
+		defer closeSrc()
+		serverOpts = append(serverOpts, grpc.Creds(creds))
+		log.Printf("SPIFFE mTLS enabled for gRPC server")
+	}
+
+	g := grpc.NewServer(serverOpts...)
 	authv1.RegisterAuthServiceServer(g, srv)
 
 	go func() {
@@ -190,7 +198,13 @@ func main() {
 	}()
 
 	mux := runtime.NewServeMux(middleware.GatewayAuthHeaderForwarder())
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	var dialCreds credentials.TransportCredentials = insecure.NewCredentials()
+	if creds, closeSrc, err := security.NewSpiffeMTLSClientCredentials(ctx); err == nil {
+		defer closeSrc()
+		dialCreds = creds
+		log.Printf("SPIFFE mTLS enabled for grpc-gateway dial")
+	}
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(dialCreds)}
 	if err := authv1.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
 		log.Fatalf("failed to register gateway: %v", err)
 	}
