@@ -13,7 +13,7 @@ This repo includes a minimal Vault dev setup intended to support Phase 2 secret 
 Start Vault in dev mode:
 
 ```bash
-docker compose -f docker-compose.vault.yaml up
+make sec-up
 ```
 
 Vault will be available at:
@@ -44,6 +44,12 @@ Read it back:
 
 ```bash
 vault kv get secret/identity
+```
+
+If you prefer automation, use:
+
+```bash
+make sec-seed
 ```
 
 ## Identity-service wiring (opt-in)

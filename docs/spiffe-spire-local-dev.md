@@ -19,17 +19,14 @@ This repo includes a minimal SPIRE dev stack to bootstrap SPIFFE identities (SVI
 1. Start the SPIRE server + agent:
 
 ```bash
-docker compose -f docker-compose.spire.yaml up
+make sec-up
 ```
 
-2. In another terminal, generate a join token on the SPIRE server (the agent is configured to use `dev-join-token`):
+2. Seed the local SPIRE setup (generates an agent config under `.dev/` and restarts the agent):
 
 ```bash
-docker compose -f docker-compose.spire.yaml exec spire-server \
-  /opt/spire/bin/spire-server token generate -spiffeID spiffe://fincore.local/spire/agent -ttl 1h -format json
+make sec-seed
 ```
-
-Set the agent join token to match.
 
 ## Register workload identities (example)
 
@@ -49,6 +46,12 @@ Repeat similarly for:
 
 - `spiffe://fincore.local/ns/default/sa/ledger-service`
 - `spiffe://fincore.local/ns/default/sa/identity-service`
+
+If you prefer automation, use:
+
+```bash
+make sec-seed
+```
 
 ## Next wiring step (not implemented yet)
 
