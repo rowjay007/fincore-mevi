@@ -83,7 +83,7 @@ curl -sS -X POST http://localhost:8082/v1/auth/logout-all \
 ### JWKS
 
 ```bash
-curl -sS http://localhost:8082/jwks.json | jq
+curl -sS http://localhost:8084/.well-known/jwks.json | jq
 ```
 
 ## Account service

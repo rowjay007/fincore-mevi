@@ -31,6 +31,24 @@ type openIDConfiguration struct {
 	IDTokenSigningAlgValuesSupported []string
 }
 
+func newHTTPHandler(gw http.Handler, cfg openIDConfiguration, jwks security.JWKS, jwksPath string) *http.ServeMux {
+	h := http.NewServeMux()
+	h.Handle("/", gw)
+	h.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(cfg)
+	})
+	h.HandleFunc(jwksPath, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
+	h.HandleFunc("/jwks.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
+	return h
+}
+
 func getenv(key string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
@@ -186,20 +204,7 @@ func main() {
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
 	}
 
-	h := http.NewServeMux()
-	h.Handle("/", mux)
-	h.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(cfg)
-	})
-	h.HandleFunc(jwksPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(jwks)
-	})
-	h.HandleFunc("/jwks.json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(jwks)
-	})
+	h := newHTTPHandler(mux, cfg, jwks, jwksPath)
 
 	log.Printf("Starting HTTP gateway on %s", httpAddr)
 	if err := http.ListenAndServe(httpAddr, h); err != nil {
