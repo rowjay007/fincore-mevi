@@ -1,0 +1,25 @@
+services:
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.9.6
+    command: ["-config", "/run/spire/server/server.conf"]
+    volumes:
+      - ./infra/spire/server:/run/spire/server
+      - spire-data:/run/spire/data
+      - spire-sockets:/run/spire/sockets
+    ports:
+      - "8081:8081" # SPIRE server health
+
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.9.6
+    command: ["-config", "/run/spire/agent/agent.conf"]
+    depends_on:
+      - spire-server
+    volumes:
+      - ./infra/spire/agent:/run/spire/agent
+      - spire-data:/run/spire/data
+      - spire-sockets:/run/spire/sockets
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  spire-data: {}
+  spire-sockets: {}
