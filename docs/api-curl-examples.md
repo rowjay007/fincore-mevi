@@ -1,11 +1,11 @@
 # API curl examples
 
-## Auth service
+## Identity service
 
 ### Register
 
 ```bash
-curl -sS -X POST http://localhost:8082/v1/auth/register \
+curl -sS -X POST http://localhost:8084/v1/auth/register \
   -H 'Content-Type: application/json' \
   -d '{
     "email": "alice@example.com",
@@ -17,7 +17,7 @@ curl -sS -X POST http://localhost:8082/v1/auth/register \
 ### Login
 
 ```bash
-curl -sS -X POST http://localhost:8082/v1/auth/login \
+curl -sS -X POST http://localhost:8084/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{
     "email": "alice@example.com",
@@ -28,11 +28,11 @@ curl -sS -X POST http://localhost:8082/v1/auth/login \
 Capture tokens:
 
 ```bash
-ACCESS_TOKEN=$(curl -sS -X POST http://localhost:8082/v1/auth/login \
+ACCESS_TOKEN=$(curl -sS -X POST http://localhost:8084/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"alice@example.com","password":"correct-horse-battery-staple"}' | jq -r .accessToken)
 
-REFRESH_TOKEN=$(curl -sS -X POST http://localhost:8082/v1/auth/login \
+REFRESH_TOKEN=$(curl -sS -X POST http://localhost:8084/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"alice@example.com","password":"correct-horse-battery-staple"}' | jq -r .refreshToken)
 ```
@@ -40,7 +40,7 @@ REFRESH_TOKEN=$(curl -sS -X POST http://localhost:8082/v1/auth/login \
 ### Validate token
 
 ```bash
-curl -sS -X POST http://localhost:8082/v1/auth/validate \
+curl -sS -X POST http://localhost:8084/v1/auth/validate \
   -H 'Content-Type: application/json' \
   -d '{"accessToken":"'"$ACCESS_TOKEN"'"}'
 ```
@@ -48,7 +48,7 @@ curl -sS -X POST http://localhost:8082/v1/auth/validate \
 ### Refresh token
 
 ```bash
-curl -sS -X POST http://localhost:8082/v1/auth/refresh \
+curl -sS -X POST http://localhost:8084/v1/auth/refresh \
   -H 'Content-Type: application/json' \
   -d '{"refreshToken":"'"$REFRESH_TOKEN"'"}'
 ```
@@ -56,7 +56,7 @@ curl -sS -X POST http://localhost:8082/v1/auth/refresh \
 ### Logout (revoke one refresh token)
 
 ```bash
-curl -sS -X POST http://localhost:8082/v1/auth/logout \
+curl -sS -X POST http://localhost:8084/v1/auth/logout \
   -H 'Content-Type: application/json' \
   -d '{"refreshToken":"'"$REFRESH_TOKEN"'"}'
 ```
@@ -66,7 +66,7 @@ curl -sS -X POST http://localhost:8082/v1/auth/logout \
 Either pass the access token in the body:
 
 ```bash
-curl -sS -X POST http://localhost:8082/v1/auth/logout-all \
+curl -sS -X POST http://localhost:8084/v1/auth/logout-all \
   -H 'Content-Type: application/json' \
   -d '{"accessToken":"'"$ACCESS_TOKEN"'"}'
 ```
@@ -74,7 +74,7 @@ curl -sS -X POST http://localhost:8082/v1/auth/logout-all \
 Or pass it via `Authorization` header (forwarded by grpc-gateway):
 
 ```bash
-curl -sS -X POST http://localhost:8082/v1/auth/logout-all \
+curl -sS -X POST http://localhost:8084/v1/auth/logout-all \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{}'

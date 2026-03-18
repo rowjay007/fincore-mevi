@@ -4,7 +4,7 @@
 
 - Install `k6`.
 - Run the services (HTTP gateways):
-  - auth-service (default `http://localhost:8082`)
+  - identity-service (default `http://localhost:8084`)
   - account-service (default `http://localhost:8080`)
   - ledger-service (default `http://localhost:8083`)
 
@@ -28,7 +28,7 @@ k6 run tests/load/k6_phase1_flow.js
 
 ## Env vars
 
-- `AUTH_SERVICE_URL` (default `http://localhost:8082`)
+- `AUTH_SERVICE_URL` (default `http://localhost:8084`)
 - `ACCOUNT_SERVICE_URL` (default `http://localhost:8080`)
 - `LEDGER_SERVICE_URL` (default `http://localhost:8083`)
 - `K6_ACCESS_TOKEN`

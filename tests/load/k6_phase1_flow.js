@@ -14,7 +14,7 @@ export const options = {
   },
 };
 
-const AUTH_URL = __ENV.AUTH_SERVICE_URL || 'http://localhost:8082';
+const AUTH_URL = __ENV.AUTH_SERVICE_URL || 'http://localhost:8084';
 const ACCOUNT_URL = __ENV.ACCOUNT_SERVICE_URL || 'http://localhost:8080';
 const LEDGER_URL = __ENV.LEDGER_SERVICE_URL || 'http://localhost:8083';
 
