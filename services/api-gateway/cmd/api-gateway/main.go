@@ -147,7 +147,7 @@ func withJWTAuth(verifier *security.JWKSVerifier, publicPrefixes []string, next 
 func parsePublicPrefixesEnv() []string {
 	v := strings.TrimSpace(os.Getenv("GATEWAY_PUBLIC_PATH_PREFIXES"))
 	if v == "" {
-		v = "/.well-known,/jwks.json,/v1/auth/"
+		v = "/.well-known,/oauth/,/v1/auth/"
 	}
 	parts := strings.Split(v, ",")
 	out := make([]string, 0, len(parts))
