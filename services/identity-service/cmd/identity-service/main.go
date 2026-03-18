@@ -28,6 +28,8 @@ import (
 type openIDConfiguration struct {
 	Issuer                           string `json:"issuer"`
 	JWKSURI                          string `json:"jwks_uri"`
+	AuthorizationEndpoint            string `json:"authorization_endpoint"`
+	TokenEndpoint                    string `json:"token_endpoint"`
 	ResponseTypesSupported           []string
 	SubjectTypesSupported            []string
 	IDTokenSigningAlgValuesSupported []string
@@ -265,9 +267,13 @@ func main() {
 	}
 
 	jwksPath := "/.well-known/jwks.json"
+	authzPath := "/oauth/authorize"
+	tokenPath := "/oauth/token"
 	cfg := openIDConfiguration{
 		Issuer:                           issuer,
 		JWKSURI:                          strings.TrimRight(issuer, "/") + jwksPath,
+		AuthorizationEndpoint:            strings.TrimRight(issuer, "/") + authzPath,
+		TokenEndpoint:                    strings.TrimRight(issuer, "/") + tokenPath,
 		ResponseTypesSupported:           []string{"token"},
 		SubjectTypesSupported:            []string{"public"},
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},

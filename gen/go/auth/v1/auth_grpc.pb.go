@@ -19,15 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Register_FullMethodName      = "/fincore.auth.v1.AuthService/Register"
-	AuthService_Login_FullMethodName         = "/fincore.auth.v1.AuthService/Login"
-	AuthService_RefreshToken_FullMethodName  = "/fincore.auth.v1.AuthService/RefreshToken"
-	AuthService_Logout_FullMethodName        = "/fincore.auth.v1.AuthService/Logout"
-	AuthService_LogoutAll_FullMethodName     = "/fincore.auth.v1.AuthService/LogoutAll"
-	AuthService_GrantRole_FullMethodName     = "/fincore.auth.v1.AuthService/GrantRole"
-	AuthService_RevokeRole_FullMethodName    = "/fincore.auth.v1.AuthService/RevokeRole"
-	AuthService_ListUserRoles_FullMethodName = "/fincore.auth.v1.AuthService/ListUserRoles"
-	AuthService_ValidateToken_FullMethodName = "/fincore.auth.v1.AuthService/ValidateToken"
+	AuthService_Register_FullMethodName                = "/fincore.auth.v1.AuthService/Register"
+	AuthService_Login_FullMethodName                   = "/fincore.auth.v1.AuthService/Login"
+	AuthService_RefreshToken_FullMethodName            = "/fincore.auth.v1.AuthService/RefreshToken"
+	AuthService_Logout_FullMethodName                  = "/fincore.auth.v1.AuthService/Logout"
+	AuthService_LogoutAll_FullMethodName               = "/fincore.auth.v1.AuthService/LogoutAll"
+	AuthService_GrantRole_FullMethodName               = "/fincore.auth.v1.AuthService/GrantRole"
+	AuthService_RevokeRole_FullMethodName              = "/fincore.auth.v1.AuthService/RevokeRole"
+	AuthService_ListUserRoles_FullMethodName           = "/fincore.auth.v1.AuthService/ListUserRoles"
+	AuthService_ValidateToken_FullMethodName           = "/fincore.auth.v1.AuthService/ValidateToken"
+	AuthService_OAuthAuthorize_FullMethodName          = "/fincore.auth.v1.AuthService/OAuthAuthorize"
+	AuthService_OAuthToken_FullMethodName              = "/fincore.auth.v1.AuthService/OAuthToken"
+	AuthService_CreateOAuthClient_FullMethodName       = "/fincore.auth.v1.AuthService/CreateOAuthClient"
+	AuthService_GetOAuthClient_FullMethodName          = "/fincore.auth.v1.AuthService/GetOAuthClient"
+	AuthService_ListOAuthClients_FullMethodName        = "/fincore.auth.v1.AuthService/ListOAuthClients"
+	AuthService_DeleteOAuthClient_FullMethodName       = "/fincore.auth.v1.AuthService/DeleteOAuthClient"
+	AuthService_RotateOAuthClientSecret_FullMethodName = "/fincore.auth.v1.AuthService/RotateOAuthClientSecret"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -43,6 +50,13 @@ type AuthServiceClient interface {
 	RevokeRole(ctx context.Context, in *RevokeRoleRequest, opts ...grpc.CallOption) (*RevokeRoleResponse, error)
 	ListUserRoles(ctx context.Context, in *ListUserRolesRequest, opts ...grpc.CallOption) (*ListUserRolesResponse, error)
 	ValidateToken(ctx context.Context, in *ValidateTokenRequest, opts ...grpc.CallOption) (*ValidateTokenResponse, error)
+	OAuthAuthorize(ctx context.Context, in *OAuthAuthorizeRequest, opts ...grpc.CallOption) (*OAuthAuthorizeResponse, error)
+	OAuthToken(ctx context.Context, in *OAuthTokenRequest, opts ...grpc.CallOption) (*OAuthTokenResponse, error)
+	CreateOAuthClient(ctx context.Context, in *CreateOAuthClientRequest, opts ...grpc.CallOption) (*CreateOAuthClientResponse, error)
+	GetOAuthClient(ctx context.Context, in *GetOAuthClientRequest, opts ...grpc.CallOption) (*GetOAuthClientResponse, error)
+	ListOAuthClients(ctx context.Context, in *ListOAuthClientsRequest, opts ...grpc.CallOption) (*ListOAuthClientsResponse, error)
+	DeleteOAuthClient(ctx context.Context, in *DeleteOAuthClientRequest, opts ...grpc.CallOption) (*DeleteOAuthClientResponse, error)
+	RotateOAuthClientSecret(ctx context.Context, in *RotateOAuthClientSecretRequest, opts ...grpc.CallOption) (*RotateOAuthClientSecretResponse, error)
 }
 
 type authServiceClient struct {
@@ -143,6 +157,76 @@ func (c *authServiceClient) ValidateToken(ctx context.Context, in *ValidateToken
 	return out, nil
 }
 
+func (c *authServiceClient) OAuthAuthorize(ctx context.Context, in *OAuthAuthorizeRequest, opts ...grpc.CallOption) (*OAuthAuthorizeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthAuthorizeResponse)
+	err := c.cc.Invoke(ctx, AuthService_OAuthAuthorize_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthToken(ctx context.Context, in *OAuthTokenRequest, opts ...grpc.CallOption) (*OAuthTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthTokenResponse)
+	err := c.cc.Invoke(ctx, AuthService_OAuthToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CreateOAuthClient(ctx context.Context, in *CreateOAuthClientRequest, opts ...grpc.CallOption) (*CreateOAuthClientResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateOAuthClientResponse)
+	err := c.cc.Invoke(ctx, AuthService_CreateOAuthClient_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetOAuthClient(ctx context.Context, in *GetOAuthClientRequest, opts ...grpc.CallOption) (*GetOAuthClientResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOAuthClientResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetOAuthClient_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListOAuthClients(ctx context.Context, in *ListOAuthClientsRequest, opts ...grpc.CallOption) (*ListOAuthClientsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOAuthClientsResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListOAuthClients_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) DeleteOAuthClient(ctx context.Context, in *DeleteOAuthClientRequest, opts ...grpc.CallOption) (*DeleteOAuthClientResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteOAuthClientResponse)
+	err := c.cc.Invoke(ctx, AuthService_DeleteOAuthClient_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) RotateOAuthClientSecret(ctx context.Context, in *RotateOAuthClientSecretRequest, opts ...grpc.CallOption) (*RotateOAuthClientSecretResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RotateOAuthClientSecretResponse)
+	err := c.cc.Invoke(ctx, AuthService_RotateOAuthClientSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -156,6 +240,13 @@ type AuthServiceServer interface {
 	RevokeRole(context.Context, *RevokeRoleRequest) (*RevokeRoleResponse, error)
 	ListUserRoles(context.Context, *ListUserRolesRequest) (*ListUserRolesResponse, error)
 	ValidateToken(context.Context, *ValidateTokenRequest) (*ValidateTokenResponse, error)
+	OAuthAuthorize(context.Context, *OAuthAuthorizeRequest) (*OAuthAuthorizeResponse, error)
+	OAuthToken(context.Context, *OAuthTokenRequest) (*OAuthTokenResponse, error)
+	CreateOAuthClient(context.Context, *CreateOAuthClientRequest) (*CreateOAuthClientResponse, error)
+	GetOAuthClient(context.Context, *GetOAuthClientRequest) (*GetOAuthClientResponse, error)
+	ListOAuthClients(context.Context, *ListOAuthClientsRequest) (*ListOAuthClientsResponse, error)
+	DeleteOAuthClient(context.Context, *DeleteOAuthClientRequest) (*DeleteOAuthClientResponse, error)
+	RotateOAuthClientSecret(context.Context, *RotateOAuthClientSecretRequest) (*RotateOAuthClientSecretResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -192,6 +283,27 @@ func (UnimplementedAuthServiceServer) ListUserRoles(context.Context, *ListUserRo
 }
 func (UnimplementedAuthServiceServer) ValidateToken(context.Context, *ValidateTokenRequest) (*ValidateTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateToken not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthAuthorize(context.Context, *OAuthAuthorizeRequest) (*OAuthAuthorizeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthAuthorize not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthToken(context.Context, *OAuthTokenRequest) (*OAuthTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthToken not implemented")
+}
+func (UnimplementedAuthServiceServer) CreateOAuthClient(context.Context, *CreateOAuthClientRequest) (*CreateOAuthClientResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOAuthClient not implemented")
+}
+func (UnimplementedAuthServiceServer) GetOAuthClient(context.Context, *GetOAuthClientRequest) (*GetOAuthClientResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOAuthClient not implemented")
+}
+func (UnimplementedAuthServiceServer) ListOAuthClients(context.Context, *ListOAuthClientsRequest) (*ListOAuthClientsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOAuthClients not implemented")
+}
+func (UnimplementedAuthServiceServer) DeleteOAuthClient(context.Context, *DeleteOAuthClientRequest) (*DeleteOAuthClientResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteOAuthClient not implemented")
+}
+func (UnimplementedAuthServiceServer) RotateOAuthClientSecret(context.Context, *RotateOAuthClientSecretRequest) (*RotateOAuthClientSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RotateOAuthClientSecret not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -376,6 +488,132 @@ func _AuthService_ValidateToken_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_OAuthAuthorize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthAuthorizeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthAuthorize(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthAuthorize_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthAuthorize(ctx, req.(*OAuthAuthorizeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthToken(ctx, req.(*OAuthTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CreateOAuthClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOAuthClientRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CreateOAuthClient(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_CreateOAuthClient_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CreateOAuthClient(ctx, req.(*CreateOAuthClientRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetOAuthClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOAuthClientRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetOAuthClient(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetOAuthClient_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetOAuthClient(ctx, req.(*GetOAuthClientRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListOAuthClients_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOAuthClientsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListOAuthClients(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListOAuthClients_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListOAuthClients(ctx, req.(*ListOAuthClientsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_DeleteOAuthClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteOAuthClientRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DeleteOAuthClient(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_DeleteOAuthClient_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DeleteOAuthClient(ctx, req.(*DeleteOAuthClientRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_RotateOAuthClientSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateOAuthClientSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RotateOAuthClientSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RotateOAuthClientSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RotateOAuthClientSecret(ctx, req.(*RotateOAuthClientSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -418,6 +656,34 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ValidateToken",
 			Handler:    _AuthService_ValidateToken_Handler,
+		},
+		{
+			MethodName: "OAuthAuthorize",
+			Handler:    _AuthService_OAuthAuthorize_Handler,
+		},
+		{
+			MethodName: "OAuthToken",
+			Handler:    _AuthService_OAuthToken_Handler,
+		},
+		{
+			MethodName: "CreateOAuthClient",
+			Handler:    _AuthService_CreateOAuthClient_Handler,
+		},
+		{
+			MethodName: "GetOAuthClient",
+			Handler:    _AuthService_GetOAuthClient_Handler,
+		},
+		{
+			MethodName: "ListOAuthClients",
+			Handler:    _AuthService_ListOAuthClients_Handler,
+		},
+		{
+			MethodName: "DeleteOAuthClient",
+			Handler:    _AuthService_DeleteOAuthClient_Handler,
+		},
+		{
+			MethodName: "RotateOAuthClientSecret",
+			Handler:    _AuthService_RotateOAuthClientSecret_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -3,10 +3,12 @@ package grpc
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/mail"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,6 +35,445 @@ func internal(err error) error {
 	return status.Error(codes.Internal, err.Error())
 }
 
+func (s *Server) userIDFromAuthHeader(ctx context.Context) (string, error) {
+	accessToken := ""
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		vals := md.Get("authorization")
+		if len(vals) == 0 {
+			vals = md.Get("Authorization")
+		}
+		if len(vals) > 0 {
+			v := strings.TrimSpace(vals[0])
+			lv := strings.ToLower(v)
+			if strings.HasPrefix(lv, "bearer ") {
+				accessToken = strings.TrimSpace(v[len("bearer "):])
+			}
+		}
+	}
+	if accessToken == "" {
+		return "", unauth("access token required")
+	}
+	payload, err := s.tokens.VerifyToken(accessToken)
+	if err != nil {
+		if errors.Is(err, security.ErrExpiredToken) || errors.Is(err, security.ErrInvalidToken) {
+			return "", unauth("invalid access token")
+		}
+		return "", internal(err)
+	}
+	userID := strings.TrimSpace(payload.UserID)
+	if userID == "" {
+		return "", unauth("invalid access token")
+	}
+	return userID, nil
+}
+
+func randomB64URL(n int) (string, error) {
+	if n <= 0 {
+		n = 32
+	}
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func hashB64URLSHA256(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return base64.RawURLEncoding.EncodeToString(h[:])
+}
+
+func normalizeClientType(v string) (string, error) {
+	v = strings.TrimSpace(strings.ToLower(v))
+	if v == "" {
+		return "public", nil
+	}
+	if v != "public" && v != "confidential" {
+		return "", invalidArg("invalid client type")
+	}
+	return v, nil
+}
+
+func splitScopes(scope string) []string {
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return nil
+	}
+	parts := strings.Fields(scope)
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
+}
+
+func (s *Server) fetchOAuthClient(ctx context.Context, clientID string) (oauthClientRecord, error) {
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return oauthClientRecord{}, invalidArg("client_id required")
+	}
+
+	var rec oauthClientRecord
+	err := s.db.QueryRow(ctx, `select id, name, type, secret_hash, redirect_uris, allowed_scopes from oauth_clients where id = $1`, clientID).
+		Scan(&rec.ID, &rec.Name, &rec.Type, &rec.SecretHash, &rec.RedirectURIs, &rec.AllowedScopes)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return oauthClientRecord{}, notFound("unknown client")
+		}
+		return oauthClientRecord{}, internal(err)
+	}
+	return rec, nil
+}
+
+func (s *Server) CreateOAuthClient(ctx context.Context, req *authv1.CreateOAuthClientRequest) (*authv1.CreateOAuthClientResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return nil, invalidArg("name required")
+	}
+	ct, err := normalizeClientType(req.Type)
+	if err != nil {
+		return nil, err
+	}
+	if len(req.RedirectUris) == 0 {
+		return nil, invalidArg("redirect_uris required")
+	}
+	redirects := make([]string, 0, len(req.RedirectUris))
+	for _, r := range req.RedirectUris {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		u, err := url.Parse(r)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return nil, invalidArg("invalid redirect_uri")
+		}
+		redirects = append(redirects, r)
+	}
+	if len(redirects) == 0 {
+		return nil, invalidArg("redirect_uris required")
+	}
+	allowedScopes := make([]string, 0, len(req.AllowedScopes))
+	for _, s := range req.AllowedScopes {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		allowedScopes = append(allowedScopes, s)
+	}
+
+	clientID := uuid.NewString()
+	var clientSecret string
+	var secretHash *string
+	if ct == "confidential" {
+		clientSecret, err = randomB64URL(32)
+		if err != nil {
+			return nil, internal(err)
+		}
+		h, err := security.HashPassword(clientSecret)
+		if err != nil {
+			return nil, internal(err)
+		}
+		secretHash = &h
+	}
+
+	var secretArg any
+	if secretHash != nil {
+		secretArg = *secretHash
+	}
+	_, err = s.db.Exec(ctx, `insert into oauth_clients (id, name, type, secret_hash, redirect_uris, allowed_scopes) values ($1,$2,$3,$4,$5,$6)`, clientID, name, ct, secretArg, redirects, allowedScopes)
+	if err != nil {
+		return nil, internal(err)
+	}
+
+	res := &authv1.CreateOAuthClientResponse{
+		Client: &authv1.OAuthClient{ClientId: clientID, Name: name, Type: ct, RedirectUris: redirects, AllowedScopes: allowedScopes},
+	}
+	if clientSecret != "" {
+		res.ClientSecret = clientSecret
+	}
+	return res, nil
+}
+
+func (s *Server) GetOAuthClient(ctx context.Context, req *authv1.GetOAuthClientRequest) (*authv1.GetOAuthClientResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	rec, err := s.fetchOAuthClient(ctx, req.ClientId)
+	if err != nil {
+		return nil, err
+	}
+	return &authv1.GetOAuthClientResponse{Client: &authv1.OAuthClient{ClientId: rec.ID, Name: rec.Name, Type: rec.Type, RedirectUris: rec.RedirectURIs, AllowedScopes: rec.AllowedScopes}}, nil
+}
+
+func (s *Server) ListOAuthClients(ctx context.Context, _ *authv1.ListOAuthClientsRequest) (*authv1.ListOAuthClientsResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(ctx, `select id, name, type, redirect_uris, allowed_scopes from oauth_clients order by created_at desc`)
+	if err != nil {
+		return nil, internal(err)
+	}
+	defer rows.Close()
+
+	var out []*authv1.OAuthClient
+	for rows.Next() {
+		var id, name, typ string
+		var redirects []string
+		var scopes []string
+		if err := rows.Scan(&id, &name, &typ, &redirects, &scopes); err != nil {
+			return nil, internal(err)
+		}
+		out = append(out, &authv1.OAuthClient{ClientId: id, Name: name, Type: typ, RedirectUris: redirects, AllowedScopes: scopes})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, internal(err)
+	}
+	return &authv1.ListOAuthClientsResponse{Clients: out}, nil
+}
+
+func (s *Server) DeleteOAuthClient(ctx context.Context, req *authv1.DeleteOAuthClientRequest) (*authv1.DeleteOAuthClientResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	clientID := strings.TrimSpace(req.ClientId)
+	if clientID == "" {
+		return nil, invalidArg("client_id required")
+	}
+	_, err := s.db.Exec(ctx, `delete from oauth_clients where id = $1`, clientID)
+	if err != nil {
+		return nil, internal(err)
+	}
+	return &authv1.DeleteOAuthClientResponse{Success: true}, nil
+}
+
+func (s *Server) RotateOAuthClientSecret(ctx context.Context, req *authv1.RotateOAuthClientSecretRequest) (*authv1.RotateOAuthClientSecretResponse, error) {
+	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
+		return nil, err
+	}
+	rec, err := s.fetchOAuthClient(ctx, req.ClientId)
+	if err != nil {
+		return nil, err
+	}
+	if rec.Type != "confidential" {
+		return nil, invalidArg("client is not confidential")
+	}
+	secret, err := randomB64URL(32)
+	if err != nil {
+		return nil, internal(err)
+	}
+	h, err := security.HashPassword(secret)
+	if err != nil {
+		return nil, internal(err)
+	}
+	_, err = s.db.Exec(ctx, `update oauth_clients set secret_hash = $2 where id = $1`, rec.ID, h)
+	if err != nil {
+		return nil, internal(err)
+	}
+	return &authv1.RotateOAuthClientSecretResponse{ClientSecret: secret}, nil
+}
+
+func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeRequest) (*authv1.OAuthAuthorizeResponse, error) {
+	if strings.TrimSpace(req.ResponseType) != "code" {
+		return nil, invalidArg("unsupported response_type")
+	}
+	clientID := strings.TrimSpace(req.ClientId)
+	redirectURI := strings.TrimSpace(req.RedirectUri)
+	if clientID == "" {
+		return nil, invalidArg("client_id required")
+	}
+	if redirectURI == "" {
+		return nil, invalidArg("redirect_uri required")
+	}
+
+	rec, err := s.fetchOAuthClient(ctx, clientID)
+	if err != nil {
+		return nil, err
+	}
+	allowedRedirect := false
+	for _, r := range rec.RedirectURIs {
+		if r == redirectURI {
+			allowedRedirect = true
+			break
+		}
+	}
+	if !allowedRedirect {
+		return nil, invalidArg("invalid redirect_uri")
+	}
+
+	challenge := strings.TrimSpace(req.CodeChallenge)
+	method := strings.TrimSpace(req.CodeChallengeMethod)
+	if challenge == "" {
+		return nil, invalidArg("code_challenge required")
+	}
+	if strings.ToUpper(method) != "S256" {
+		return nil, invalidArg("code_challenge_method must be S256")
+	}
+
+	userID, err := s.userIDFromAuthHeader(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	code, err := randomB64URL(32)
+	if err != nil {
+		return nil, internal(err)
+	}
+	codeHash := hashB64URLSHA256(code)
+
+	exp := time.Now().UTC().Add(5 * time.Minute)
+	scopes := splitScopes(req.Scope)
+	_, err = s.db.Exec(ctx, `insert into oauth_authorization_codes (code_hash, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, expires_at) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		codeHash, rec.ID, userID, redirectURI, scopes, challenge, "S256", exp)
+	if err != nil {
+		return nil, internal(err)
+	}
+
+	u, err := url.Parse(redirectURI)
+	if err != nil {
+		return nil, internal(err)
+	}
+	q := u.Query()
+	q.Set("code", code)
+	if strings.TrimSpace(req.State) != "" {
+		q.Set("state", strings.TrimSpace(req.State))
+	}
+	u.RawQuery = q.Encode()
+
+	return &authv1.OAuthAuthorizeResponse{Code: code, State: strings.TrimSpace(req.State), RedirectUrl: u.String()}, nil
+}
+
+func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) (*authv1.OAuthTokenResponse, error) {
+	if strings.TrimSpace(req.GrantType) != "authorization_code" {
+		return nil, invalidArg("unsupported grant_type")
+	}
+	clientID := strings.TrimSpace(req.ClientId)
+	if clientID == "" {
+		return nil, invalidArg("client_id required")
+	}
+	code := strings.TrimSpace(req.Code)
+	if code == "" {
+		return nil, invalidArg("code required")
+	}
+	redirectURI := strings.TrimSpace(req.RedirectUri)
+	if redirectURI == "" {
+		return nil, invalidArg("redirect_uri required")
+	}
+	verifier := strings.TrimSpace(req.CodeVerifier)
+	if verifier == "" {
+		return nil, invalidArg("code_verifier required")
+	}
+
+	rec, err := s.fetchOAuthClient(ctx, clientID)
+	if err != nil {
+		return nil, err
+	}
+	if rec.Type == "confidential" {
+		if rec.SecretHash == nil {
+			return nil, internal(errors.New("confidential client missing secret"))
+		}
+		sec := strings.TrimSpace(req.ClientSecret)
+		if sec == "" {
+			return nil, unauth("client_secret required")
+		}
+		ok, err := security.VerifyPassword(sec, *rec.SecretHash)
+		if err != nil {
+			return nil, internal(err)
+		}
+		if !ok {
+			return nil, unauth("invalid client_secret")
+		}
+	}
+
+	codeHash := hashB64URLSHA256(code)
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, internal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var userID string
+	var storedRedirect string
+	var scopes []string
+	var storedChallenge string
+	var method string
+	var expiresAt time.Time
+	var consumedAt *time.Time
+	row := tx.QueryRow(ctx, `select user_id, redirect_uri, scopes, code_challenge, code_challenge_method, expires_at, consumed_at from oauth_authorization_codes where code_hash = $1 and client_id = $2`, codeHash, rec.ID)
+	if err := row.Scan(&userID, &storedRedirect, &scopes, &storedChallenge, &method, &expiresAt, &consumedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, unauth("invalid code")
+		}
+		return nil, internal(err)
+	}
+
+	now := time.Now().UTC()
+	if consumedAt != nil {
+		return nil, unauth("code already used")
+	}
+	if now.After(expiresAt.UTC()) {
+		return nil, unauth("code expired")
+	}
+	if storedRedirect != redirectURI {
+		return nil, unauth("invalid redirect_uri")
+	}
+	if strings.ToUpper(strings.TrimSpace(method)) != "S256" {
+		return nil, unauth("invalid code")
+	}
+	expected := strings.TrimSpace(storedChallenge)
+	got := hashB64URLSHA256(verifier)
+	if expected == "" || got == "" || expected != got {
+		return nil, unauth("invalid code_verifier")
+	}
+
+	_, err = tx.Exec(ctx, `update oauth_authorization_codes set consumed_at = $2 where code_hash = $1 and consumed_at is null`, codeHash, now)
+	if err != nil {
+		return nil, internal(err)
+	}
+
+	roles, perms, err := s.getRolesAndPermissions(ctx, userID)
+	if err != nil {
+		return nil, internal(err)
+	}
+	accessNow := time.Now().UTC()
+	accessExp := accessNow.Add(s.accessTTL)
+	access, err := s.tokens.CreateToken(security.TokenPayload{UserID: userID, Roles: roles, Permissions: perms, IssuedAt: accessNow, ExpiredAt: accessExp})
+	if err != nil {
+		return nil, internal(err)
+	}
+
+	refresh, err := newRefreshToken()
+	if err != nil {
+		return nil, internal(err)
+	}
+	refreshExp := accessNow.Add(s.refreshTTL)
+	absExp := refreshExp
+	refreshHash := security.HashRefreshToken(refresh)
+	_, err = tx.Exec(ctx, `insert into auth_refresh_sessions (token_hash, session_id, user_id, expires_at, absolute_expires_at, user_agent, ip) values ($1,$1,$2,$3,$4,$5,$6)`, refreshHash, userID, refreshExp, absExp, nil, nil)
+	if err != nil {
+		return nil, internal(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, internal(err)
+	}
+
+	_ = scopes
+	return &authv1.OAuthTokenResponse{AccessToken: access, TokenType: "bearer", ExpiresIn: int64(s.accessTTL.Seconds()), RefreshToken: refresh}, nil
+}
+
 func normalizeEmail(email string) (string, error) {
 	e := strings.TrimSpace(strings.ToLower(email))
 	if e == "" {
@@ -51,6 +492,15 @@ type Server struct {
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 	limiter    *loginLimiter
+}
+
+type oauthClientRecord struct {
+	ID            string
+	Name          string
+	Type          string
+	SecretHash    *string
+	RedirectURIs  []string
+	AllowedScopes []string
 }
 
 type DB interface {

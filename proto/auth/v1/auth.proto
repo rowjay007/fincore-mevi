@@ -63,6 +63,51 @@ service AuthService {
   }
 
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  rpc OAuthAuthorize(OAuthAuthorizeRequest) returns (OAuthAuthorizeResponse) {
+    option (google.api.http) = {
+      get: "/oauth/authorize"
+    };
+  }
+
+  rpc OAuthToken(OAuthTokenRequest) returns (OAuthTokenResponse) {
+    option (google.api.http) = {
+      post: "/oauth/token"
+      body: "*"
+    };
+  }
+
+  rpc CreateOAuthClient(CreateOAuthClientRequest) returns (CreateOAuthClientResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/admin/oauth/clients"
+      body: "*"
+    };
+  }
+
+  rpc GetOAuthClient(GetOAuthClientRequest) returns (GetOAuthClientResponse) {
+    option (google.api.http) = {
+      get: "/v1/auth/admin/oauth/clients/{client_id}"
+    };
+  }
+
+  rpc ListOAuthClients(ListOAuthClientsRequest) returns (ListOAuthClientsResponse) {
+    option (google.api.http) = {
+      get: "/v1/auth/admin/oauth/clients"
+    };
+  }
+
+  rpc DeleteOAuthClient(DeleteOAuthClientRequest) returns (DeleteOAuthClientResponse) {
+    option (google.api.http) = {
+      delete: "/v1/auth/admin/oauth/clients/{client_id}"
+    };
+  }
+
+  rpc RotateOAuthClientSecret(RotateOAuthClientSecretRequest) returns (RotateOAuthClientSecretResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/admin/oauth/clients/{client_id}/secret:rotate"
+      body: "*"
+    };
+  }
 }
 
 message RegisterRequest {
@@ -147,4 +192,86 @@ message ListUserRolesRequest {
 
 message ListUserRolesResponse {
   repeated string roles = 1;
+}
+
+message OAuthAuthorizeRequest {
+  string response_type = 1;
+  string client_id = 2;
+  string redirect_uri = 3;
+  string scope = 4;
+  string state = 5;
+  string code_challenge = 6;
+  string code_challenge_method = 7;
+}
+
+message OAuthAuthorizeResponse {
+  string code = 1;
+  string state = 2;
+  string redirect_url = 3;
+}
+
+message OAuthTokenRequest {
+  string grant_type = 1;
+  string code = 2;
+  string redirect_uri = 3;
+  string client_id = 4;
+  string client_secret = 5;
+  string code_verifier = 6;
+}
+
+message OAuthTokenResponse {
+  string access_token = 1;
+  string token_type = 2;
+  int64 expires_in = 3;
+  string refresh_token = 4;
+}
+
+message OAuthClient {
+  string client_id = 1;
+  string name = 2;
+  string type = 3;
+  repeated string redirect_uris = 4;
+  repeated string allowed_scopes = 5;
+}
+
+message CreateOAuthClientRequest {
+  string name = 1;
+  string type = 2;
+  repeated string redirect_uris = 3;
+  repeated string allowed_scopes = 4;
+}
+
+message CreateOAuthClientResponse {
+  OAuthClient client = 1;
+  string client_secret = 2;
+}
+
+message GetOAuthClientRequest {
+  string client_id = 1;
+}
+
+message GetOAuthClientResponse {
+  OAuthClient client = 1;
+}
+
+message ListOAuthClientsRequest {}
+
+message ListOAuthClientsResponse {
+  repeated OAuthClient clients = 1;
+}
+
+message DeleteOAuthClientRequest {
+  string client_id = 1;
+}
+
+message DeleteOAuthClientResponse {
+  bool success = 1;
+}
+
+message RotateOAuthClientSecretRequest {
+  string client_id = 1;
+}
+
+message RotateOAuthClientSecretResponse {
+  string client_secret = 1;
 }
