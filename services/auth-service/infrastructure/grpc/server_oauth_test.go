@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -14,7 +15,85 @@ import (
 
 type oauthAdminTokenMaker struct{}
 
-func (oauthAdminTokenMaker) CreateToken(payload security.TokenPayload) (string, error) { return "access", nil }
+func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	// server token maker isn't used for client auth
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	secretHash, err := security.HashPassword("sec")
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+	secretHashPtr := &secretHash
+
+	db.ExpectQuery("select id, name, type, secret_hash, redirect_uris, allowed_scopes from oauth_clients").WithArgs("c1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "type", "secret_hash", "redirect_uris", "allowed_scopes"}).AddRow("c1", "client", "confidential", secretHashPtr, []string{"https://app.example/cb"}, []string{}))
+
+	db.ExpectBegin()
+	exp := time.Now().UTC().Add(2 * time.Minute)
+	storedChallenge := hashB64URLSHA256("ver")
+	db.ExpectQuery("select user_id, redirect_uri, scopes, code_challenge").WithArgs(pgxmock.AnyArg(), "c1").
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "redirect_uri", "scopes", "code_challenge", "code_challenge_method", "expires_at", "consumed_at"}).AddRow("user-1", "https://app.example/cb", []string{"openid"}, storedChallenge, "S256", exp, nil))
+	db.ExpectExec("update oauth_authorization_codes set consumed_at").WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg()).WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	db.ExpectQuery("select r.name").WithArgs("user-1").WillReturnRows(pgxmock.NewRows([]string{"name"}).AddRow("customer"))
+	db.ExpectQuery("select distinct p.name").WithArgs("user-1").WillReturnRows(pgxmock.NewRows([]string{"name"}).AddRow("account:read"))
+
+	db.ExpectExec("insert into auth_refresh_sessions").WithArgs(pgxmock.AnyArg(), "user-1", pgxmock.AnyArg(), pgxmock.AnyArg(), nil, nil).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	db.ExpectCommit()
+
+	basic := base64.StdEncoding.EncodeToString([]byte("c1:sec"))
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Basic "+basic))
+	res, err := s.OAuthToken(ctx, &authv1.OAuthTokenRequest{GrantType: "authorization_code", Code: "code", RedirectUri: "https://app.example/cb", ClientId: "c1", CodeVerifier: "ver"})
+	if err != nil {
+		t.Fatalf("OAuthToken: %v", err)
+	}
+	if res.AccessToken == "" || res.RefreshToken == "" {
+		t.Fatalf("expected tokens")
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestOAuthToken_ConfidentialClient_MissingSecretDenied(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	secretHash, err := security.HashPassword("sec")
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+	secretHashPtr := &secretHash
+
+	db.ExpectQuery("select id, name, type, secret_hash, redirect_uris, allowed_scopes from oauth_clients").WithArgs("c1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "type", "secret_hash", "redirect_uris", "allowed_scopes"}).AddRow("c1", "client", "confidential", secretHashPtr, []string{"https://app.example/cb"}, []string{}))
+
+	_, err = s.OAuthToken(context.Background(), &authv1.OAuthTokenRequest{GrantType: "authorization_code", Code: "code", RedirectUri: "https://app.example/cb", ClientId: "c1", CodeVerifier: "ver"})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func (oauthAdminTokenMaker) CreateToken(payload security.TokenPayload) (string, error) {
+	return "access", nil
+}
 func (oauthAdminTokenMaker) VerifyToken(token string) (*security.TokenPayload, error) {
 	now := time.Now().UTC()
 	return &security.TokenPayload{UserID: "admin-1", Permissions: []string{"auth:admin"}, IssuedAt: now, ExpiredAt: now.Add(time.Minute)}, nil
@@ -22,7 +101,9 @@ func (oauthAdminTokenMaker) VerifyToken(token string) (*security.TokenPayload, e
 
 type oauthUserTokenMaker struct{}
 
-func (oauthUserTokenMaker) CreateToken(payload security.TokenPayload) (string, error) { return "access", nil }
+func (oauthUserTokenMaker) CreateToken(payload security.TokenPayload) (string, error) {
+	return "access", nil
+}
 func (oauthUserTokenMaker) VerifyToken(token string) (*security.TokenPayload, error) {
 	now := time.Now().UTC()
 	return &security.TokenPayload{UserID: "user-1", Roles: []string{"customer"}, Permissions: []string{"account:read"}, IssuedAt: now, ExpiredAt: now.Add(time.Minute)}, nil

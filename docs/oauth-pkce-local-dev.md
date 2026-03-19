@@ -56,6 +56,13 @@ ADMIN_ACCESS_TOKEN=... \
 ./scripts/oauth_pkce_flow.sh
 ```
 
+### Confidential clients (client authentication)
+
+For confidential clients, `/oauth/token` accepts `client_id` + `client_secret` either:
+
+- In the JSON body (fields `client_id` and `client_secret`), or
+- Via HTTP Basic auth header: `Authorization: Basic base64(client_id:client_secret)`
+
 ### What the script does
 
 - Registers a user (best-effort)

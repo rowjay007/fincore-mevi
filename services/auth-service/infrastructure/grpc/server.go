@@ -44,9 +44,9 @@ func (s *Server) userIDFromAuthHeader(ctx context.Context) (string, error) {
 		}
 		if len(vals) > 0 {
 			v := strings.TrimSpace(vals[0])
-			lv := strings.ToLower(v)
-			if strings.HasPrefix(lv, "bearer ") {
-				accessToken = strings.TrimSpace(v[len("bearer "):])
+			const prefix = "Bearer "
+			if strings.HasPrefix(v, prefix) {
+				accessToken = strings.TrimSpace(strings.TrimPrefix(v, prefix))
 			}
 		}
 	}
@@ -64,7 +64,35 @@ func (s *Server) userIDFromAuthHeader(ctx context.Context) (string, error) {
 	if userID == "" {
 		return "", unauth("invalid access token")
 	}
-	return userID, nil
+	return payload.UserID, nil
+}
+
+func basicAuthFromMetadata(ctx context.Context) (username string, password string, ok bool) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", "", false
+	}
+	vals := md.Get("authorization")
+	if len(vals) == 0 {
+		vals = md.Get("Authorization")
+	}
+	if len(vals) == 0 {
+		return "", "", false
+	}
+	v := strings.TrimSpace(vals[0])
+	const prefix = "Basic "
+	if !strings.HasPrefix(v, prefix) {
+		return "", "", false
+	}
+	dec, err := base64.StdEncoding.DecodeString(strings.TrimSpace(strings.TrimPrefix(v, prefix)))
+	if err != nil {
+		return "", "", false
+	}
+	parts := strings.SplitN(string(dec), ":", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
 }
 
 func randomB64URL(n int) (string, error) {
@@ -360,6 +388,14 @@ func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) 
 	}
 	clientID := strings.TrimSpace(req.ClientId)
 	if clientID == "" {
+		if u, p, ok := basicAuthFromMetadata(ctx); ok {
+			clientID = strings.TrimSpace(u)
+			if strings.TrimSpace(req.ClientSecret) == "" {
+				req.ClientSecret = p
+			}
+		}
+	}
+	if clientID == "" {
 		return nil, invalidArg("client_id required")
 	}
 	code := strings.TrimSpace(req.Code)
@@ -384,6 +420,14 @@ func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) 
 			return nil, internal(errors.New("confidential client missing secret"))
 		}
 		sec := strings.TrimSpace(req.ClientSecret)
+		if sec == "" {
+			if u, p, ok := basicAuthFromMetadata(ctx); ok {
+				if strings.TrimSpace(u) != "" && strings.TrimSpace(u) != rec.ID {
+					return nil, unauth("invalid client")
+				}
+				sec = strings.TrimSpace(p)
+			}
+		}
 		if sec == "" {
 			return nil, unauth("client_secret required")
 		}

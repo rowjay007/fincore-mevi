@@ -6,6 +6,7 @@ EMAIL="${EMAIL:-user@example.com}"
 PASSWORD="${PASSWORD:-password123}"
 FULL_NAME="${FULL_NAME:-User Example}"
 REDIRECT_URI="${REDIRECT_URI:-https://app.example/cb}"
+CLIENT_TYPE="${CLIENT_TYPE:-public}"
 
 need() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -59,8 +60,9 @@ fi
 CLIENT=$(curl -sS -X POST "$BASE_URL/v1/auth/admin/oauth/clients" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $ADMIN_ACCESS_TOKEN" \
-  -d "{\"name\":\"local-dev-client\",\"type\":\"public\",\"redirect_uris\":[\"$REDIRECT_URI\"],\"allowed_scopes\":[\"openid\"]}")
+  -d "{\"name\":\"local-dev-client\",\"type\":\"$CLIENT_TYPE\",\"redirect_uris\":[\"$REDIRECT_URI\"],\"allowed_scopes\":[\"openid\"]}")
 CLIENT_ID=$(echo "$CLIENT" | jq -r .client.client_id)
+CLIENT_SECRET=$(echo "$CLIENT" | jq -r .client_secret)
 if [[ "$CLIENT_ID" == "null" || -z "$CLIENT_ID" ]]; then
   echo "client create failed: $CLIENT" >&2
   exit 1
@@ -100,8 +102,20 @@ if [[ "$CODE" == "null" || -z "$CODE" ]]; then
 fi
 
 echo "==> Exchange code for tokens"
+AUTHZ_HEADER=""
+BODY_CLIENT_SECRET=""
+if [[ "$CLIENT_TYPE" == "confidential" ]]; then
+  if [[ "$CLIENT_SECRET" == "null" || -z "$CLIENT_SECRET" ]]; then
+    echo "expected client_secret for confidential client" >&2
+    exit 1
+  fi
+  BASIC=$(printf '%s' "$CLIENT_ID:$CLIENT_SECRET" | openssl base64 -A)
+  AUTHZ_HEADER="Authorization: Basic $BASIC"
+fi
+
 TOKEN=$(curl -sS -X POST "$BASE_URL/oauth/token" \
   -H 'Content-Type: application/json' \
+  ${AUTHZ_HEADER:+-H "$AUTHZ_HEADER"} \
   -d "{\"grant_type\":\"authorization_code\",\"code\":\"$CODE\",\"redirect_uri\":\"$REDIRECT_URI\",\"client_id\":\"$CLIENT_ID\",\"code_verifier\":\"$CODE_VERIFIER\"}")
 
 echo "$TOKEN" | jq .
