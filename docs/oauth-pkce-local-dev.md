@@ -17,6 +17,20 @@ Admin client registry endpoints:
 - `DELETE /v1/auth/admin/oauth/clients/{client_id}`
 - `POST /v1/auth/admin/oauth/clients/{client_id}/secret:rotate`
 
+## Browser-based authorize flow
+
+`GET /oauth/authorize` now serves a minimal HTML login/consent form when the client sends `Accept: text/html` (typical browser behavior). Submitting the form will:
+
+- Login using the provided email/password
+- Issue an authorization code (PKCE)
+- Respond with a `302` redirect to the OAuth client `redirect_uri` with `code` and `state`
+
+Smoke-check:
+
+```bash
+open "http://localhost:8080/oauth/authorize?response_type=code&client_id=CLIENT_ID&redirect_uri=https%3A%2F%2Fapp.example%2Fcb&scope=openid&state=abc&code_challenge=CHALLENGE&code_challenge_method=S256"
+```
+
 ## Gateway auth/routing notes
 
 - The gateway treats `/.well-known/*` and `/oauth/*` as public by default.
@@ -48,7 +62,7 @@ ADMIN_ACCESS_TOKEN=... \
 - Logs in to get a *user* access token
 - Uses `ADMIN_ACCESS_TOKEN` to create a public OAuth client with `REDIRECT_URI`
 - Generates PKCE verifier + S256 challenge
-- Calls `/oauth/authorize` (currently API-first and requires the user's bearer token)
+- Calls `/oauth/authorize` (API-first JSON mode, requires the user's bearer token)
 - Exchanges the code at `/oauth/token`
 
 ## Troubleshooting

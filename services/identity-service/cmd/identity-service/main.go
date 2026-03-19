@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"html/template"
 	"log"
 	"net"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	authv1 "fincore/gen/go/auth/v1"
 	"fincore/pkg/postgres"
@@ -35,9 +37,147 @@ type openIDConfiguration struct {
 	IDTokenSigningAlgValuesSupported []string
 }
 
-func newHTTPHandler(gw http.Handler, cfg openIDConfiguration, jwks security.JWKS, jwksPath string) *http.ServeMux {
+type authorizePageData struct {
+	Error               string
+	ClientID            string
+	RedirectURI         string
+	Scope               string
+	State               string
+	CodeChallenge       string
+	CodeChallengeMethod string
+}
+
+var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Authorize</title>
+  </head>
+  <body>
+    <h1>Authorize</h1>
+    {{if .Error}}<p style="color:#b00020">{{.Error}}</p>{{end}}
+    <p>Client: <code>{{.ClientID}}</code></p>
+    <p>Scope: <code>{{.Scope}}</code></p>
+    <form method="post" action="/oauth/authorize">
+      <input type="hidden" name="client_id" value="{{.ClientID}}" />
+      <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}" />
+      <input type="hidden" name="scope" value="{{.Scope}}" />
+      <input type="hidden" name="state" value="{{.State}}" />
+      <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}" />
+      <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}" />
+
+      <label>Email<br />
+        <input type="email" name="email" autocomplete="username" required />
+      </label>
+      <br />
+      <label>Password<br />
+        <input type="password" name="password" autocomplete="current-password" required />
+      </label>
+      <br />
+      <label>
+        <input type="checkbox" name="approve" value="yes" required />
+        Approve
+      </label>
+      <br />
+      <button type="submit">Continue</button>
+    </form>
+  </body>
+</html>`))
+
+func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string) *http.ServeMux {
 	h := http.NewServeMux()
 	h.Handle("/", gw)
+	h.HandleFunc("/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
+		accept := strings.ToLower(r.Header.Get("Accept"))
+		wantsHTML := strings.Contains(accept, "text/html") || accept == "" || accept == "*/*"
+		if !wantsHTML {
+			gw.ServeHTTP(w, r)
+			return
+		}
+
+		q := r.URL.Query()
+		data := authorizePageData{
+			ClientID:            strings.TrimSpace(q.Get("client_id")),
+			RedirectURI:         strings.TrimSpace(q.Get("redirect_uri")),
+			Scope:               strings.TrimSpace(q.Get("scope")),
+			State:               strings.TrimSpace(q.Get("state")),
+			CodeChallenge:       strings.TrimSpace(q.Get("code_challenge")),
+			CodeChallengeMethod: strings.TrimSpace(q.Get("code_challenge_method")),
+		}
+		if data.CodeChallengeMethod == "" {
+			data.CodeChallengeMethod = "S256"
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_ = authorizePageTmpl.Execute(w, data)
+			return
+		case http.MethodPost:
+			if err := r.ParseForm(); err != nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				data.Error = "invalid form"
+				_ = authorizePageTmpl.Execute(w, data)
+				return
+			}
+			data.ClientID = strings.TrimSpace(r.Form.Get("client_id"))
+			data.RedirectURI = strings.TrimSpace(r.Form.Get("redirect_uri"))
+			data.Scope = strings.TrimSpace(r.Form.Get("scope"))
+			data.State = strings.TrimSpace(r.Form.Get("state"))
+			data.CodeChallenge = strings.TrimSpace(r.Form.Get("code_challenge"))
+			data.CodeChallengeMethod = strings.TrimSpace(r.Form.Get("code_challenge_method"))
+			if data.CodeChallengeMethod == "" {
+				data.CodeChallengeMethod = "S256"
+			}
+
+			email := strings.TrimSpace(r.Form.Get("email"))
+			password := r.Form.Get("password")
+			approve := strings.TrimSpace(r.Form.Get("approve"))
+			if approve != "yes" {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				data.Error = "approval required"
+				_ = authorizePageTmpl.Execute(w, data)
+				return
+			}
+			if email == "" || password == "" {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				data.Error = "email and password required"
+				_ = authorizePageTmpl.Execute(w, data)
+				return
+			}
+
+			loginRes, err := authClient.Login(r.Context(), &authv1.LoginRequest{Email: email, Password: password})
+			if err != nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				data.Error = "login failed"
+				_ = authorizePageTmpl.Execute(w, data)
+				return
+			}
+			authCtx := metadata.NewOutgoingContext(r.Context(), metadata.Pairs("authorization", "Bearer "+loginRes.AccessToken))
+			res, err := authClient.OAuthAuthorize(authCtx, &authv1.OAuthAuthorizeRequest{
+				ResponseType:        "code",
+				ClientId:            data.ClientID,
+				RedirectUri:         data.RedirectURI,
+				Scope:               data.Scope,
+				State:               data.State,
+				CodeChallenge:       data.CodeChallenge,
+				CodeChallengeMethod: data.CodeChallengeMethod,
+			})
+			if err != nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				data.Error = "authorize failed"
+				_ = authorizePageTmpl.Execute(w, data)
+				return
+			}
+			http.Redirect(w, r, res.RedirectUrl, http.StatusFound)
+			return
+		default:
+			w.Header().Set("Allow", "GET, POST")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+	})
 	h.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(cfg)
@@ -265,6 +405,12 @@ func main() {
 	if err := authv1.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
 		log.Fatalf("failed to register gateway: %v", err)
 	}
+	conn, err := grpc.DialContext(ctx, grpcAddr, opts...)
+	if err != nil {
+		log.Fatalf("failed to dial local grpc: %v", err)
+	}
+	defer conn.Close()
+	authClient := authv1.NewAuthServiceClient(conn)
 
 	jwksPath := "/.well-known/jwks.json"
 	authzPath := "/oauth/authorize"
@@ -279,7 +425,7 @@ func main() {
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
 	}
 
-	h := newHTTPHandler(mux, cfg, jwks, jwksPath)
+	h := newHTTPHandler(mux, authClient, cfg, jwks, jwksPath)
 
 	log.Printf("Starting HTTP gateway on %s", httpAddr)
 	if err := http.ListenAndServe(httpAddr, h); err != nil {

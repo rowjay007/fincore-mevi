@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	authv1 "fincore/gen/go/auth/v1"
 	"fincore/pkg/security"
 )
 
@@ -13,7 +14,7 @@ func TestWellKnownEndpoints(t *testing.T) {
 	cfg := openIDConfiguration{Issuer: "http://example", JWKSURI: "http://example/.well-known/jwks.json"}
 	jwks := security.JWKS{Keys: []security.JWK{{Kty: "OKP", Crv: "Ed25519", Kid: "kid1", X: "x"}}}
 
-	h := newHTTPHandler(http.NewServeMux(), cfg, jwks, "/.well-known/jwks.json")
+	h := newHTTPHandler(http.NewServeMux(), authv1.AuthServiceClient(nil), cfg, jwks, "/.well-known/jwks.json")
 
 	{
 		req := httptest.NewRequest(http.MethodGet, "http://example/.well-known/openid-configuration", nil)
