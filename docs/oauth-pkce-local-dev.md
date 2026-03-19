@@ -63,6 +63,10 @@ For confidential clients, `/oauth/token` accepts `client_id` + `client_secret` e
 - In the JSON body (fields `client_id` and `client_secret`), or
 - Via HTTP Basic auth header: `Authorization: Basic base64(client_id:client_secret)`
 
+### Scopes (allowlist enforcement)
+
+If an OAuth client is created with `allowed_scopes`, then `/oauth/authorize` will reject any requested scope not present in that allowlist.
+
 ### What the script does
 
 - Registers a user (best-effort)

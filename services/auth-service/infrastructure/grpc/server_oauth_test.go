@@ -63,6 +63,29 @@ func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
 	}
 }
 
+func TestOAuthAuthorize_RejectsDisallowedScope(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	db.ExpectQuery("select id, name, type, secret_hash, redirect_uris, allowed_scopes from oauth_clients").WithArgs("c1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "type", "secret_hash", "redirect_uris", "allowed_scopes"}).AddRow("c1", "client", "public", nil, []string{"https://app.example/cb"}, []string{"openid"}))
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer access"))
+	_, err = s.OAuthAuthorize(ctx, &authv1.OAuthAuthorizeRequest{ResponseType: "code", ClientId: "c1", RedirectUri: "https://app.example/cb", Scope: "openid profile", State: "s", CodeChallenge: "challenge", CodeChallengeMethod: "S256"})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestOAuthToken_ConfidentialClient_MissingSecretDenied(t *testing.T) {
 	db, err := pgxmock.NewPool()
 	if err != nil {

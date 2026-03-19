@@ -340,6 +340,23 @@ func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeR
 		return nil, invalidArg("invalid redirect_uri")
 	}
 
+	requestedScopes := splitScopes(req.Scope)
+	if len(rec.AllowedScopes) != 0 {
+		allowed := map[string]struct{}{}
+		for _, s := range rec.AllowedScopes {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
+			allowed[s] = struct{}{}
+		}
+		for _, s := range requestedScopes {
+			if _, ok := allowed[s]; !ok {
+				return nil, invalidArg("invalid scope")
+			}
+		}
+	}
+
 	challenge := strings.TrimSpace(req.CodeChallenge)
 	method := strings.TrimSpace(req.CodeChallengeMethod)
 	if challenge == "" {
@@ -361,9 +378,8 @@ func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeR
 	codeHash := hashB64URLSHA256(code)
 
 	exp := time.Now().UTC().Add(5 * time.Minute)
-	scopes := splitScopes(req.Scope)
 	_, err = s.db.Exec(ctx, `insert into oauth_authorization_codes (code_hash, client_id, user_id, redirect_uri, scopes, code_challenge, code_challenge_method, expires_at) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		codeHash, rec.ID, userID, redirectURI, scopes, challenge, "S256", exp)
+		codeHash, rec.ID, userID, redirectURI, requestedScopes, challenge, "S256", exp)
 	if err != nil {
 		return nil, internal(err)
 	}
