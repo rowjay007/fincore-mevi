@@ -589,7 +589,7 @@ func main() {
 	if err := authv1.RegisterAuthServiceHandlerFromEndpoint(ctx, mux, grpcAddr, opts); err != nil {
 		log.Fatalf("failed to register gateway: %v", err)
 	}
-	conn, err := grpc.DialContext(ctx, grpcAddr, opts...)
+	conn, err := grpc.NewClient(grpcAddr, opts...)
 	if err != nil {
 		log.Fatalf("failed to dial local grpc: %v", err)
 	}
