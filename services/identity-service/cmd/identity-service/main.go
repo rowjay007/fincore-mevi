@@ -38,6 +38,8 @@ type openIDConfiguration struct {
 	JWKSURI                          string   `json:"jwks_uri"`
 	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
 	TokenEndpoint                    string   `json:"token_endpoint"`
+	GrantTypesSupported              []string `json:"grant_types_supported,omitempty"`
+	CodeChallengeMethodsSupported    []string `json:"code_challenge_methods_supported,omitempty"`
 	ResponseTypesSupported           []string `json:"response_types_supported"`
 	SubjectTypesSupported            []string `json:"subject_types_supported"`
 	IDTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported"`
@@ -604,6 +606,8 @@ func main() {
 		JWKSURI:                          strings.TrimRight(issuer, "/") + jwksPath,
 		AuthorizationEndpoint:            strings.TrimRight(issuer, "/") + authzPath,
 		TokenEndpoint:                    strings.TrimRight(issuer, "/") + tokenPath,
+		GrantTypesSupported:              []string{"authorization_code"},
+		CodeChallengeMethodsSupported:    []string{"S256"},
 		ResponseTypesSupported:           []string{"code"},
 		SubjectTypesSupported:            []string{"public"},
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},

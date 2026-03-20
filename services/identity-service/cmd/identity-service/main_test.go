@@ -16,6 +16,8 @@ func TestWellKnownEndpoints(t *testing.T) {
 		JWKSURI:                          "http://example/.well-known/jwks.json",
 		AuthorizationEndpoint:            "http://example/oauth/authorize",
 		TokenEndpoint:                    "http://example/oauth/token",
+		GrantTypesSupported:              []string{"authorization_code"},
+		CodeChallengeMethodsSupported:    []string{"S256"},
 		ResponseTypesSupported:           []string{"code"},
 		SubjectTypesSupported:            []string{"public"},
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
@@ -40,6 +42,12 @@ func TestWellKnownEndpoints(t *testing.T) {
 		}
 		if len(got.ResponseTypesSupported) != 1 || got.ResponseTypesSupported[0] != "code" {
 			t.Fatalf("expected response_types_supported [code], got %+v", got.ResponseTypesSupported)
+		}
+		if len(got.GrantTypesSupported) != 1 || got.GrantTypesSupported[0] != "authorization_code" {
+			t.Fatalf("expected grant_types_supported [authorization_code], got %+v", got.GrantTypesSupported)
+		}
+		if len(got.CodeChallengeMethodsSupported) != 1 || got.CodeChallengeMethodsSupported[0] != "S256" {
+			t.Fatalf("expected code_challenge_methods_supported [S256], got %+v", got.CodeChallengeMethodsSupported)
 		}
 	}
 
