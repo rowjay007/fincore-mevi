@@ -31,6 +31,16 @@ On some failures, the authorize endpoint will redirect back to the `redirect_uri
 - `error_description`
 - `state`
 
+Error code mapping (best-effort):
+
+| gRPC status | Example | OAuth2 error |
+|---|---|---|
+| `InvalidArgument` | invalid/missing request params | `invalid_request` |
+| `InvalidArgument` containing "scope" | scope not allowed | `invalid_scope` |
+| `PermissionDenied` | consent denied | `access_denied` |
+| `Unauthenticated` | not logged in / invalid session | `unauthorized_client` |
+| other | internal failure | `server_error` |
+
 Security hardening: `redirect_uri` values containing a fragment (`#...`) are rejected.
 
 ### Browser session

@@ -19,9 +19,11 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	authv1 "fincore/gen/go/auth/v1"
 	"fincore/pkg/postgres"
@@ -185,6 +187,35 @@ func oauth2ErrorRedirect(redirectURI string, state string, code string, desc str
 	return u.String(), true
 }
 
+func oauth2ErrorFromGRPC(err error) (code string, desc string) {
+	if err == nil {
+		return "server_error", ""
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return "server_error", ""
+	}
+	msg := strings.TrimSpace(st.Message())
+	switch st.Code() {
+	case codes.InvalidArgument:
+		if strings.Contains(strings.ToLower(msg), "scope") {
+			return "invalid_scope", msg
+		}
+		return "invalid_request", msg
+	case codes.PermissionDenied:
+		return "access_denied", msg
+	case codes.Unauthenticated:
+		return "unauthorized_client", msg
+	case codes.NotFound:
+		return "unauthorized_client", msg
+	default:
+		if msg == "" {
+			msg = "server error"
+		}
+		return "server_error", msg
+	}
+}
+
 func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string) *http.ServeMux {
 	h := http.NewServeMux()
 	store := newBrowserSessionStore(30 * time.Minute)
@@ -313,7 +344,8 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 				CodeChallengeMethod: data.CodeChallengeMethod,
 			})
 			if err != nil {
-				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "invalid_request", "authorize failed"); ok {
+				code, desc := oauth2ErrorFromGRPC(err)
+				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, code, desc); ok {
 					http.Redirect(w, r, loc, http.StatusFound)
 					return
 				}
