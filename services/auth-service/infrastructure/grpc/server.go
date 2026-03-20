@@ -324,6 +324,13 @@ func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeR
 	if redirectURI == "" {
 		return nil, invalidArg("redirect_uri required")
 	}
+	uParsed, err := url.Parse(redirectURI)
+	if err != nil {
+		return nil, invalidArg("invalid redirect_uri")
+	}
+	if strings.TrimSpace(uParsed.Fragment) != "" {
+		return nil, invalidArg("redirect_uri must not contain fragment")
+	}
 
 	rec, err := s.fetchOAuthClient(ctx, clientID)
 	if err != nil {
@@ -384,18 +391,14 @@ func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeR
 		return nil, internal(err)
 	}
 
-	u, err := url.Parse(redirectURI)
-	if err != nil {
-		return nil, internal(err)
-	}
-	q := u.Query()
+	q := uParsed.Query()
 	q.Set("code", code)
 	if strings.TrimSpace(req.State) != "" {
 		q.Set("state", strings.TrimSpace(req.State))
 	}
-	u.RawQuery = q.Encode()
+	uParsed.RawQuery = q.Encode()
 
-	return &authv1.OAuthAuthorizeResponse{Code: code, State: strings.TrimSpace(req.State), RedirectUrl: u.String()}, nil
+	return &authv1.OAuthAuthorizeResponse{Code: code, State: strings.TrimSpace(req.State), RedirectUrl: uParsed.String()}, nil
 }
 
 func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) (*authv1.OAuthTokenResponse, error) {
@@ -421,6 +424,13 @@ func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) 
 	redirectURI := strings.TrimSpace(req.RedirectUri)
 	if redirectURI == "" {
 		return nil, invalidArg("redirect_uri required")
+	}
+	rParsed, err := url.Parse(redirectURI)
+	if err != nil {
+		return nil, invalidArg("invalid redirect_uri")
+	}
+	if strings.TrimSpace(rParsed.Fragment) != "" {
+		return nil, invalidArg("redirect_uri must not contain fragment")
 	}
 	verifier := strings.TrimSpace(req.CodeVerifier)
 	if verifier == "" {

@@ -25,6 +25,14 @@ Admin client registry endpoints:
 - Issue an authorization code (PKCE)
 - Respond with a `302` redirect to the OAuth client `redirect_uri` with `code` and `state`
 
+On some failures, the authorize endpoint will redirect back to the `redirect_uri` with OAuth2-style query parameters:
+
+- `error`
+- `error_description`
+- `state`
+
+Security hardening: `redirect_uri` values containing a fragment (`#...`) are rejected.
+
 Smoke-check:
 
 ```bash

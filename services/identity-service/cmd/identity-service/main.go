@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -85,6 +86,26 @@ var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype
   </body>
 </html>`))
 
+func oauth2ErrorRedirect(redirectURI string, state string, code string, desc string) (string, bool) {
+	u, err := url.Parse(strings.TrimSpace(redirectURI))
+	if err != nil {
+		return "", false
+	}
+	if strings.TrimSpace(u.Fragment) != "" {
+		return "", false
+	}
+	q := u.Query()
+	q.Set("error", code)
+	if strings.TrimSpace(desc) != "" {
+		q.Set("error_description", desc)
+	}
+	if strings.TrimSpace(state) != "" {
+		q.Set("state", state)
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), true
+}
+
 func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string) *http.ServeMux {
 	h := http.NewServeMux()
 	h.Handle("/", gw)
@@ -111,6 +132,19 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 
 		switch r.Method {
 		case http.MethodGet:
+			if strings.TrimSpace(q.Get("response_type")) != "code" {
+				data.Error = "unsupported response_type"
+			}
+			if data.ClientID == "" || data.RedirectURI == "" || data.CodeChallenge == "" {
+				if data.Error == "" {
+					data.Error = "missing required parameters"
+				}
+			}
+			if strings.ToUpper(strings.TrimSpace(data.CodeChallengeMethod)) != "S256" {
+				if data.Error == "" {
+					data.Error = "code_challenge_method must be S256"
+				}
+			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_ = authorizePageTmpl.Execute(w, data)
 			return
@@ -135,12 +169,20 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 			password := r.Form.Get("password")
 			approve := strings.TrimSpace(r.Form.Get("approve"))
 			if approve != "yes" {
+				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "access_denied", "approval required"); ok {
+					http.Redirect(w, r, loc, http.StatusFound)
+					return
+				}
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data.Error = "approval required"
 				_ = authorizePageTmpl.Execute(w, data)
 				return
 			}
 			if email == "" || password == "" {
+				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "invalid_request", "email and password required"); ok {
+					http.Redirect(w, r, loc, http.StatusFound)
+					return
+				}
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data.Error = "email and password required"
 				_ = authorizePageTmpl.Execute(w, data)
@@ -165,6 +207,10 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 				CodeChallengeMethod: data.CodeChallengeMethod,
 			})
 			if err != nil {
+				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "invalid_request", "authorize failed"); ok {
+					http.Redirect(w, r, loc, http.StatusFound)
+					return
+				}
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data.Error = "authorize failed"
 				_ = authorizePageTmpl.Execute(w, data)

@@ -15,6 +15,23 @@ import (
 
 type oauthAdminTokenMaker struct{}
 
+func TestOAuthAuthorize_RejectsRedirectURIFragment(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	redirect := "https://app.example/cb#frag"
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer access"))
+	_, err = s.OAuthAuthorize(ctx, &authv1.OAuthAuthorizeRequest{ResponseType: "code", ClientId: "c1", RedirectUri: redirect, Scope: "openid", State: "s", CodeChallenge: "challenge", CodeChallengeMethod: "S256"})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
 func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
 	db, err := pgxmock.NewPool()
 	if err != nil {
