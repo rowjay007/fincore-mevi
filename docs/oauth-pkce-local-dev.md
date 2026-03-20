@@ -33,6 +33,16 @@ On some failures, the authorize endpoint will redirect back to the `redirect_uri
 
 Security hardening: `redirect_uri` values containing a fragment (`#...`) are rejected.
 
+### Browser session
+
+The HTML authorize flow uses an HTTP-only cookie (`fincore_authorize_session`) to avoid re-entering credentials for each authorize attempt.
+
+To clear the browser session:
+
+```bash
+curl -i -X POST http://localhost:8080/oauth/logout
+```
+
 Smoke-check:
 
 ```bash

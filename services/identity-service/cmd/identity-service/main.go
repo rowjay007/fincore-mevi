@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"html/template"
 	"log"
@@ -12,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -46,6 +49,7 @@ type authorizePageData struct {
 	State               string
 	CodeChallenge       string
 	CodeChallengeMethod string
+	LoggedIn            bool
 }
 
 var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype html>
@@ -68,6 +72,7 @@ var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype
       <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}" />
       <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}" />
 
+      {{if not .LoggedIn}}
       <label>Email<br />
         <input type="email" name="email" autocomplete="username" required />
       </label>
@@ -76,6 +81,9 @@ var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype
         <input type="password" name="password" autocomplete="current-password" required />
       </label>
       <br />
+      {{else}}
+      <p>Logged in</p>
+      {{end}}
       <label>
         <input type="checkbox" name="approve" value="yes" required />
         Approve
@@ -85,6 +93,77 @@ var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype
     </form>
   </body>
 </html>`))
+
+type browserSessionStore struct {
+	mu       sync.Mutex
+	sessions map[string]browserSession
+	ttl      time.Duration
+}
+
+type browserSession struct {
+	AccessToken string
+	ExpiresAt   time.Time
+}
+
+func newBrowserSessionStore(ttl time.Duration) *browserSessionStore {
+	if ttl <= 0 {
+		ttl = 30 * time.Minute
+	}
+	return &browserSessionStore{sessions: map[string]browserSession{}, ttl: ttl}
+}
+
+func (s *browserSessionStore) get(sessionID string) (browserSession, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if strings.TrimSpace(sessionID) == "" {
+		return browserSession{}, false
+	}
+	ss, ok := s.sessions[sessionID]
+	if !ok {
+		return browserSession{}, false
+	}
+	if time.Now().UTC().After(ss.ExpiresAt.UTC()) {
+		delete(s.sessions, sessionID)
+		return browserSession{}, false
+	}
+	return ss, true
+}
+
+func (s *browserSessionStore) put(accessToken string) (string, browserSession, bool) {
+	accessToken = strings.TrimSpace(accessToken)
+	if accessToken == "" {
+		return "", browserSession{}, false
+	}
+	id, err := randomB64URL(32)
+	if err != nil {
+		return "", browserSession{}, false
+	}
+	ss := browserSession{AccessToken: accessToken, ExpiresAt: time.Now().UTC().Add(s.ttl)}
+	s.mu.Lock()
+	s.sessions[id] = ss
+	s.mu.Unlock()
+	return id, ss, true
+}
+
+func (s *browserSessionStore) del(sessionID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if strings.TrimSpace(sessionID) == "" {
+		return
+	}
+	delete(s.sessions, sessionID)
+}
+
+func randomB64URL(n int) (string, error) {
+	if n <= 0 {
+		n = 32
+	}
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
 
 func oauth2ErrorRedirect(redirectURI string, state string, code string, desc string) (string, bool) {
 	u, err := url.Parse(strings.TrimSpace(redirectURI))
@@ -108,7 +187,17 @@ func oauth2ErrorRedirect(redirectURI string, state string, code string, desc str
 
 func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string) *http.ServeMux {
 	h := http.NewServeMux()
+	store := newBrowserSessionStore(30 * time.Minute)
+	const sessionCookieName = "fincore_authorize_session"
 	h.Handle("/", gw)
+	h.HandleFunc("/oauth/logout", func(w http.ResponseWriter, r *http.Request) {
+		c, err := r.Cookie(sessionCookieName)
+		if err == nil {
+			store.del(c.Value)
+		}
+		http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+		w.WriteHeader(http.StatusNoContent)
+	})
 	h.HandleFunc("/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
 		accept := strings.ToLower(r.Header.Get("Accept"))
 		wantsHTML := strings.Contains(accept, "text/html") || accept == "" || accept == "*/*"
@@ -116,6 +205,12 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 			gw.ServeHTTP(w, r)
 			return
 		}
+
+		var sessionID string
+		if c, err := r.Cookie(sessionCookieName); err == nil {
+			sessionID = strings.TrimSpace(c.Value)
+		}
+		sess, hasSession := store.get(sessionID)
 
 		q := r.URL.Query()
 		data := authorizePageData{
@@ -125,6 +220,7 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 			State:               strings.TrimSpace(q.Get("state")),
 			CodeChallenge:       strings.TrimSpace(q.Get("code_challenge")),
 			CodeChallengeMethod: strings.TrimSpace(q.Get("code_challenge_method")),
+			LoggedIn:            hasSession,
 		}
 		if data.CodeChallengeMethod == "" {
 			data.CodeChallengeMethod = "S256"
@@ -178,7 +274,7 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 				_ = authorizePageTmpl.Execute(w, data)
 				return
 			}
-			if email == "" || password == "" {
+			if !hasSession && (email == "" || password == "") {
 				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "invalid_request", "email and password required"); ok {
 					http.Redirect(w, r, loc, http.StatusFound)
 					return
@@ -189,14 +285,24 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 				return
 			}
 
-			loginRes, err := authClient.Login(r.Context(), &authv1.LoginRequest{Email: email, Password: password})
-			if err != nil {
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				data.Error = "login failed"
-				_ = authorizePageTmpl.Execute(w, data)
-				return
+			accessToken := ""
+			if hasSession {
+				accessToken = sess.AccessToken
+			} else {
+				loginRes, err := authClient.Login(r.Context(), &authv1.LoginRequest{Email: email, Password: password})
+				if err != nil {
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					data.Error = "login failed"
+					_ = authorizePageTmpl.Execute(w, data)
+					return
+				}
+				accessToken = loginRes.AccessToken
+				newID, _, ok := store.put(accessToken)
+				if ok {
+					http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: newID, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil})
+				}
 			}
-			authCtx := metadata.NewOutgoingContext(r.Context(), metadata.Pairs("authorization", "Bearer "+loginRes.AccessToken))
+			authCtx := metadata.NewOutgoingContext(r.Context(), metadata.Pairs("authorization", "Bearer "+accessToken))
 			res, err := authClient.OAuthAuthorize(authCtx, &authv1.OAuthAuthorizeRequest{
 				ResponseType:        "code",
 				ClientId:            data.ClientID,
