@@ -11,7 +11,15 @@ import (
 )
 
 func TestWellKnownEndpoints(t *testing.T) {
-	cfg := openIDConfiguration{Issuer: "http://example", JWKSURI: "http://example/.well-known/jwks.json"}
+	cfg := openIDConfiguration{
+		Issuer:                           "http://example",
+		JWKSURI:                          "http://example/.well-known/jwks.json",
+		AuthorizationEndpoint:            "http://example/oauth/authorize",
+		TokenEndpoint:                    "http://example/oauth/token",
+		ResponseTypesSupported:           []string{"code"},
+		SubjectTypesSupported:            []string{"public"},
+		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
+	}
 	jwks := security.JWKS{Keys: []security.JWK{{Kty: "OKP", Crv: "Ed25519", Kid: "kid1", X: "x"}}}
 
 	h := newHTTPHandler(http.NewServeMux(), authv1.AuthServiceClient(nil), cfg, jwks, "/.well-known/jwks.json")
@@ -29,6 +37,9 @@ func TestWellKnownEndpoints(t *testing.T) {
 		}
 		if got.JWKSURI != cfg.JWKSURI {
 			t.Fatalf("expected jwks_uri %q, got %q", cfg.JWKSURI, got.JWKSURI)
+		}
+		if len(got.ResponseTypesSupported) != 1 || got.ResponseTypesSupported[0] != "code" {
+			t.Fatalf("expected response_types_supported [code], got %+v", got.ResponseTypesSupported)
 		}
 	}
 

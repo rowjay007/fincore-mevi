@@ -34,13 +34,13 @@ import (
 )
 
 type openIDConfiguration struct {
-	Issuer                           string `json:"issuer"`
-	JWKSURI                          string `json:"jwks_uri"`
-	AuthorizationEndpoint            string `json:"authorization_endpoint"`
-	TokenEndpoint                    string `json:"token_endpoint"`
-	ResponseTypesSupported           []string
-	SubjectTypesSupported            []string
-	IDTokenSigningAlgValuesSupported []string
+	Issuer                           string   `json:"issuer"`
+	JWKSURI                          string   `json:"jwks_uri"`
+	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
+	TokenEndpoint                    string   `json:"token_endpoint"`
+	ResponseTypesSupported           []string `json:"response_types_supported"`
+	SubjectTypesSupported            []string `json:"subject_types_supported"`
+	IDTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported"`
 }
 
 type authorizePageData struct {
@@ -604,7 +604,7 @@ func main() {
 		JWKSURI:                          strings.TrimRight(issuer, "/") + jwksPath,
 		AuthorizationEndpoint:            strings.TrimRight(issuer, "/") + authzPath,
 		TokenEndpoint:                    strings.TrimRight(issuer, "/") + tokenPath,
-		ResponseTypesSupported:           []string{"token"},
+		ResponseTypesSupported:           []string{"code"},
 		SubjectTypesSupported:            []string{"public"},
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
 	}
