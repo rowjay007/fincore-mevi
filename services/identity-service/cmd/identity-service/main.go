@@ -53,6 +53,7 @@ type authorizePageData struct {
 	State               string
 	CodeChallenge       string
 	CodeChallengeMethod string
+	CSRFToken           string
 	LoggedIn            bool
 }
 
@@ -75,6 +76,7 @@ var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype
       <input type="hidden" name="state" value="{{.State}}" />
       <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}" />
       <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}" />
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}" />
 
       {{if not .LoggedIn}}
       <label>Email<br />
@@ -222,6 +224,7 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 	h := http.NewServeMux()
 	store := newBrowserSessionStore(30 * time.Minute)
 	const sessionCookieName = "fincore_authorize_session"
+	const csrfCookieName = "fincore_authorize_csrf"
 	h.Handle("/", gw)
 	h.HandleFunc("/oauth/logout", func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(sessionCookieName)
@@ -255,6 +258,19 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 			CodeChallengeMethod: strings.TrimSpace(q.Get("code_challenge_method")),
 			LoggedIn:            hasSession,
 		}
+
+		csrfCookieVal := ""
+		if c, err := r.Cookie(csrfCookieName); err == nil {
+			csrfCookieVal = strings.TrimSpace(c.Value)
+		}
+		if csrfCookieVal == "" {
+			v, err := randomB64URL(32)
+			if err == nil {
+				csrfCookieVal = v
+				http.SetCookie(w, &http.Cookie{Name: csrfCookieName, Value: csrfCookieVal, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil})
+			}
+		}
+		data.CSRFToken = csrfCookieVal
 		if data.CodeChallengeMethod == "" {
 			data.CodeChallengeMethod = "S256"
 		}
@@ -290,8 +306,24 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 			data.State = strings.TrimSpace(r.Form.Get("state"))
 			data.CodeChallenge = strings.TrimSpace(r.Form.Get("code_challenge"))
 			data.CodeChallengeMethod = strings.TrimSpace(r.Form.Get("code_challenge_method"))
+			data.CSRFToken = strings.TrimSpace(r.Form.Get("csrf_token"))
 			if data.CodeChallengeMethod == "" {
 				data.CodeChallengeMethod = "S256"
+			}
+
+			cookieToken := ""
+			if c, err := r.Cookie(csrfCookieName); err == nil {
+				cookieToken = strings.TrimSpace(c.Value)
+			}
+			if cookieToken == "" || data.CSRFToken == "" || cookieToken != data.CSRFToken {
+				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "invalid_request", "csrf required"); ok {
+					http.Redirect(w, r, loc, http.StatusFound)
+					return
+				}
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				data.Error = "csrf required"
+				_ = authorizePageTmpl.Execute(w, data)
+				return
 			}
 
 			email := strings.TrimSpace(r.Form.Get("email"))
