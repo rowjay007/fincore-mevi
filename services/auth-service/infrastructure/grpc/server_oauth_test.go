@@ -9,8 +9,10 @@ import (
 	authv1 "fincore/gen/go/auth/v1"
 	"fincore/pkg/security"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type oauthAdminTokenMaker struct{}
@@ -80,6 +82,47 @@ func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
 	}
 }
 
+func TestOAuthToken_ConfidentialClient_UsesBasicAuthClientID(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	secretHash, err := security.HashPassword("sec")
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+	secretHashPtr := &secretHash
+
+	db.ExpectQuery("select id, name, type, secret_hash, redirect_uris, allowed_scopes from oauth_clients").WithArgs("c1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "type", "secret_hash", "redirect_uris", "allowed_scopes"}).AddRow("c1", "client", "confidential", secretHashPtr, []string{"https://app.example/cb"}, []string{}))
+
+	basic := base64.StdEncoding.EncodeToString([]byte("c1:sec"))
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Basic "+basic))
+
+	db.ExpectBegin()
+	db.ExpectQuery("select user_id, redirect_uri, scopes, code_challenge").WithArgs(pgxmock.AnyArg(), "c1").
+		WillReturnError(pgx.ErrNoRows)
+	db.ExpectRollback()
+
+	_, err = s.OAuthToken(ctx, &authv1.OAuthTokenRequest{GrantType: "authorization_code", Code: "code", RedirectUri: "https://app.example/cb", CodeVerifier: "ver"})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if st, ok := status.FromError(err); ok {
+		if st.Message() != "invalid code" {
+			t.Fatalf("expected invalid code, got %q", st.Message())
+		}
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestOAuthAuthorize_RejectsDisallowedScope(t *testing.T) {
 	db, err := pgxmock.NewPool()
 	if err != nil {
@@ -124,6 +167,11 @@ func TestOAuthToken_ConfidentialClient_MissingSecretDenied(t *testing.T) {
 	_, err = s.OAuthToken(context.Background(), &authv1.OAuthTokenRequest{GrantType: "authorization_code", Code: "code", RedirectUri: "https://app.example/cb", ClientId: "c1", CodeVerifier: "ver"})
 	if err == nil {
 		t.Fatalf("expected error")
+	}
+	if st, ok := status.FromError(err); ok {
+		if st.Message() != "invalid_client" {
+			t.Fatalf("expected invalid_client, got %q", st.Message())
+		}
 	}
 
 	if err := db.ExpectationsWereMet(); err != nil {

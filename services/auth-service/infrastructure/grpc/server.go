@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -28,6 +29,12 @@ func unauth(msg string) error      { return status.Error(codes.Unauthenticated, 
 func forbidden(msg string) error   { return status.Error(codes.PermissionDenied, msg) }
 func notFound(msg string) error    { return status.Error(codes.NotFound, msg) }
 func rateLimited(msg string) error { return status.Error(codes.ResourceExhausted, msg) }
+
+func oauthInvalidClient(ctx context.Context) error {
+	_ = grpc.SetHeader(ctx, metadata.Pairs("www-authenticate", "Basic realm=\"oauth\""))
+	return unauth("invalid_client")
+}
+
 func internal(err error) error {
 	if err == nil {
 		return status.Error(codes.Internal, "internal error")
@@ -449,20 +456,20 @@ func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) 
 		if sec == "" {
 			if u, p, ok := basicAuthFromMetadata(ctx); ok {
 				if strings.TrimSpace(u) != "" && strings.TrimSpace(u) != rec.ID {
-					return nil, unauth("invalid client")
+					return nil, oauthInvalidClient(ctx)
 				}
 				sec = strings.TrimSpace(p)
 			}
 		}
 		if sec == "" {
-			return nil, unauth("client_secret required")
+			return nil, oauthInvalidClient(ctx)
 		}
 		ok, err := security.VerifyPassword(sec, *rec.SecretHash)
 		if err != nil {
 			return nil, internal(err)
 		}
 		if !ok {
-			return nil, unauth("invalid client_secret")
+			return nil, oauthInvalidClient(ctx)
 		}
 	}
 
