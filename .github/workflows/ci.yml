@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -26,16 +26,53 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      - name: cache staticcheck
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/bin/staticcheck
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-staticcheck-0.5.1
+
+      - name: staticcheck
+        run: |
+          test -x "$(go env GOPATH)/bin/staticcheck" || go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
+          staticcheck ./...
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
       - name: unit tests
         run: go test ./...
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: race tests
         run: go test -race ./...
 
-      - name: staticcheck
-        run: |
-          go install honnef.co/go/tools/cmd/staticcheck@latest
-          staticcheck ./...
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: coverage threshold (security packages)
         env:
