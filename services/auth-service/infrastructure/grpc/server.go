@@ -35,6 +35,10 @@ func oauthInvalidClient(ctx context.Context) error {
 	return unauth("invalid_client")
 }
 
+func oauthInvalidGrant() error {
+	return status.Error(codes.InvalidArgument, "invalid_grant")
+}
+
 func internal(err error) error {
 	if err == nil {
 		return status.Error(codes.Internal, "internal error")
@@ -341,6 +345,9 @@ func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeR
 
 	rec, err := s.fetchOAuthClient(ctx, clientID)
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
+			return nil, oauthInvalidClient(ctx)
+		}
 		return nil, err
 	}
 	allowedRedirect := false
@@ -446,6 +453,9 @@ func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) 
 
 	rec, err := s.fetchOAuthClient(ctx, clientID)
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
+			return nil, oauthInvalidClient(ctx)
+		}
 		return nil, err
 	}
 	if rec.Type == "confidential" {
@@ -491,28 +501,28 @@ func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) 
 	row := tx.QueryRow(ctx, `select user_id, redirect_uri, scopes, code_challenge, code_challenge_method, expires_at, consumed_at from oauth_authorization_codes where code_hash = $1 and client_id = $2`, codeHash, rec.ID)
 	if err := row.Scan(&userID, &storedRedirect, &scopes, &storedChallenge, &method, &expiresAt, &consumedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, unauth("invalid code")
+			return nil, oauthInvalidGrant()
 		}
 		return nil, internal(err)
 	}
 
 	now := time.Now().UTC()
 	if consumedAt != nil {
-		return nil, unauth("code already used")
+		return nil, oauthInvalidGrant()
 	}
 	if now.After(expiresAt.UTC()) {
-		return nil, unauth("code expired")
+		return nil, oauthInvalidGrant()
 	}
 	if storedRedirect != redirectURI {
-		return nil, unauth("invalid redirect_uri")
+		return nil, oauthInvalidGrant()
 	}
 	if strings.ToUpper(strings.TrimSpace(method)) != "S256" {
-		return nil, unauth("invalid code")
+		return nil, oauthInvalidGrant()
 	}
 	expected := strings.TrimSpace(storedChallenge)
 	got := hashB64URLSHA256(verifier)
 	if expected == "" || got == "" || expected != got {
-		return nil, unauth("invalid code_verifier")
+		return nil, oauthInvalidGrant()
 	}
 
 	_, err = tx.Exec(ctx, `update oauth_authorization_codes set consumed_at = $2 where code_hash = $1 and consumed_at is null`, codeHash, now)

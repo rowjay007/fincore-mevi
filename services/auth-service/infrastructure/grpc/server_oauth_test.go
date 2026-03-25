@@ -82,6 +82,33 @@ func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
 	}
 }
 
+func TestOAuthToken_UnknownClient_ReturnsInvalidClient(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	db.ExpectQuery("select id, name, type, secret_hash, redirect_uris, allowed_scopes from oauth_clients").WithArgs("c-unknown").
+		WillReturnError(pgx.ErrNoRows)
+
+	_, err = s.OAuthToken(context.Background(), &authv1.OAuthTokenRequest{GrantType: "authorization_code", Code: "code", RedirectUri: "https://app.example/cb", ClientId: "c-unknown", CodeVerifier: "ver"})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if st, ok := status.FromError(err); ok {
+		if st.Message() != "invalid_client" {
+			t.Fatalf("expected invalid_client, got %q", st.Message())
+		}
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestOAuthToken_ConfidentialClient_UsesBasicAuthClientID(t *testing.T) {
 	db, err := pgxmock.NewPool()
 	if err != nil {
@@ -113,8 +140,8 @@ func TestOAuthToken_ConfidentialClient_UsesBasicAuthClientID(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 	if st, ok := status.FromError(err); ok {
-		if st.Message() != "invalid code" {
-			t.Fatalf("expected invalid code, got %q", st.Message())
+		if st.Message() != "invalid_grant" {
+			t.Fatalf("expected invalid_grant, got %q", st.Message())
 		}
 	}
 
