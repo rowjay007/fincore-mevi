@@ -89,45 +89,134 @@ Repo invariants (enforced by code + tests):
 
 This is the full target system. Services are deployed independently and communicate via gRPC (internal) and the gateway (external).
 
+Service catalog conventions:
+
+- Each service has a clearly defined **data ownership boundary**.
+- Public APIs are exposed via `api-gateway` only.
+- Internal service-to-service calls use SPIFFE/SPIRE mTLS.
+- Integration events use the transactional outbox pattern.
+
 - `api-gateway`
   - Public/private routing and policy enforcement
   - Rate limiting and request shaping by path
   - JWT verification via JWKS
+  - Ownership:
+    - Edge policy: routing, authN/authZ enforcement, and request limits
+  - External interfaces:
+    - HTTP JSON via gRPC-gateway for public endpoints
+  - Key dependencies:
+    - JWKS from `identity-service`
 - `identity-service`
   - OIDC discovery and JWKS serving
   - OAuth2 authorization UX (`/oauth/authorize`) and token issuance (`/oauth/token`)
   - Client registry, PKCE enforcement, refresh tokens, sessions/consent
+  - Ownership:
+    - Identity, authentication, authorization tokens, OAuth2/OIDC
+    - Client registry and redirect URI/scope allowlists
+  - External interfaces:
+    - `/.well-known/openid-configuration`
+    - `/.well-known/jwks.json`
+    - `/oauth/authorize`
+    - `/oauth/token`
+  - Data:
+    - OAuth clients, authorization codes, refresh sessions, consent records
 - `account-service`
   - Account lifecycle and account-level invariants
   - CQRS + Event Sourcing + snapshots
+  - Ownership:
+    - Customer accounts and account state machine
+  - External interfaces:
+    - Account open/close, status, balances (via gateway)
+  - Data:
+    - Event stream + snapshots, projections (read models)
 - `ledger-service`
   - Double-entry ledger and posting rules
   - CQRS + Event Sourcing
+  - Ownership:
+    - Ledger entries, posting rules, and accounting correctness
+  - External interfaces:
+    - Post transactions, query balances and ledger lines (via gateway)
+  - Data:
+    - Event stream, immutable ledger records, projections
 - `payment-service`
   - Payment initiation/authorization/settlement
   - Saga orchestration (Temporal) with compensations
   - Idempotency enforcement
+  - Ownership:
+    - Payment state machine, orchestration, and idempotency keys
+  - External interfaces:
+    - Initiate payment, authorize, settle, cancel, status (via gateway)
+  - Key dependencies:
+    - `account-service` for account validation
+    - `ledger-service` for posting
+    - `fraud-engine` for risk checks
+    - `fx-service` for FX quotes (when applicable)
+  - Data:
+    - Payment aggregate events, idempotency records, workflow state references
 - `fraud-engine`
   - Rules + ML scoring
   - Decisioning APIs for payment risk checks
+  - Ownership:
+    - Fraud rules, feature computation, and decisions
+  - External interfaces:
+    - Internal decisioning API (called by `payment-service`)
+  - Data:
+    - Rulesets, model versions, decision logs
 - `vault-service`
   - PCI tokenization boundary
   - Sensitive data vaulting and cryptographic operations
+  - Ownership:
+    - Tokenization, encryption, and storage of sensitive identifiers
+  - External interfaces:
+    - Internal tokenization APIs
+  - Data:
+    - Vaulted records and cryptographic metadata
 - `fx-service`
   - Multi-currency conversion and rate sourcing
   - FX quotation and settlement support
+  - Ownership:
+    - FX rate ingestion, quoting, and conversion logic
+  - External interfaces:
+    - Quote and conversion APIs (primarily internal)
+  - Data:
+    - FX rates, quotes, and settlement references
 - `notification-service`
   - Event-driven customer/operator notifications
   - Templates and delivery channels (email/SMS/push)
+  - Ownership:
+    - Notification templates and delivery policy
+  - External interfaces:
+    - Internal send APIs and event subscribers
+  - Data:
+    - Templates, delivery logs, user preferences
 - `reporting-service`
   - Read models and regulatory reports
   - Batch exports and analytics feeds
+  - Ownership:
+    - Read-optimized views and regulatory outputs
+  - External interfaces:
+    - Report generation and export APIs
+  - Data:
+    - OLAP projections (ClickHouse) and export artifacts
 - `audit-service`
   - Tamper-evident audit trails
   - Compliance exports and retention policies
+  - Ownership:
+    - Compliance-grade audit trails and retrieval
+  - External interfaces:
+    - Audit query/export APIs (private by default)
+  - Data:
+    - Append-only audit log and export manifests
 - `admin-service`
   - Internal-only operator tooling
   - Client/admin workflows (disable client, rotate secrets, support operations)
+  - Ownership:
+    - Internal admin workflows and operator approvals
+  - External interfaces:
+    - Private admin APIs only (never public)
+  - Key dependencies:
+    - `identity-service` client lifecycle endpoints
+    - `audit-service` for audit capture and exports
 
 ## 5. Phase plan (milestone execution)
 
@@ -191,6 +280,14 @@ Acceptance criteria:
   - audit fields
 - Observability for auth flows (metrics + tracing)
 
+Acceptance criteria:
+
+- OAuth token errors are RFC-aligned (`invalid_client`, `invalid_grant`, `invalid_request`) and include `WWW-Authenticate` where required.
+- Consent can be granted/denied and is persisted and queryable for the client/user pair.
+- Session fixation is prevented and cookies are hardened (secure, httpOnly, sameSite).
+- Client lifecycle operations are auditable and do not weaken redirect URI validation.
+- Traces and metrics exist for authorize/token endpoints with no secret leakage.
+
 ### Phase 3: payments and sagas
 
 - Introduce `payment-service` as the saga coordinator (Temporal workflows)
@@ -202,6 +299,12 @@ Acceptance criteria:
 - A payment can be initiated and settled with compensations on failure.
 - Idempotency prevents double-charging on retries.
 
+Milestone deliverables:
+
+- Payment state machine modeled as events + projections.
+- Temporal workflows (orchestrator) with explicit compensation steps.
+- Integration events published via outbox (payment initiated/authorized/settled/failed).
+
 ### Phase 4: reporting, audit, and observability
 
 - Projections into OLAP store (ClickHouse)
@@ -211,12 +314,24 @@ Acceptance criteria:
   - metrics (Prometheus)
   - logs (structured JSON)
 
+Acceptance criteria:
+
+- Every critical money movement emits an audit trail entry with immutable correlation IDs.
+- Reporting projections are reproducible from source events.
+- Dashboards exist for golden signals and error budgets.
+
 ### Phase 5: production readiness
 
 - Kubernetes + Helm
 - GitOps (ArgoCD)
 - Terraform
 - Chaos testing + load testing (k6)
+
+Acceptance criteria:
+
+- GitOps-managed environments exist for dev/stage/prod.
+- mTLS identities are managed and rotated without downtime.
+- Load tests and chaos experiments are in CI/CD pipelines with clear pass/fail gates.
 
 ## 6. Deliverables checklist (per phase)
 
