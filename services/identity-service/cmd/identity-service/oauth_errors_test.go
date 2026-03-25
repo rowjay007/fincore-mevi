@@ -55,7 +55,7 @@ func TestOAuth2ErrorFromGRPC_PermissionDenied(t *testing.T) {
 }
 
 func TestAuthorizeCSRF_MissingTokenRedirectsError(t *testing.T) {
-	h := newHTTPHandler(http.NewServeMux(), nil, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json")
+	h := newHTTPHandler(http.NewServeMux(), nil, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
 
 	// First GET should set CSRF cookie.
 	getReq := httptest.NewRequest(http.MethodGet, "http://example/oauth/authorize?response_type=code&client_id=c1&redirect_uri=https%3A%2F%2Fapp.example%2Fcb&scope=openid&state=s&code_challenge=ch&code_challenge_method=S256", nil)

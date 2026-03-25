@@ -108,6 +108,9 @@ service AuthService {
       body: "*"
     };
   }
+
+  rpc GetOAuthConsent(GetOAuthConsentRequest) returns (GetOAuthConsentResponse);
+  rpc StoreOAuthConsent(StoreOAuthConsentRequest) returns (StoreOAuthConsentResponse);
 }
 
 message RegisterRequest {
@@ -272,6 +275,25 @@ message RotateOAuthClientSecretRequest {
   string client_id = 1;
 }
 
+
+message GetOAuthConsentRequest {
+  string user_id = 1;
+  string client_id = 2;
+}
+
+message GetOAuthConsentResponse {
+  repeated string scopes = 1;
+}
+
+message StoreOAuthConsentRequest {
+  string user_id = 1;
+  string client_id = 2;
+  repeated string scopes = 3;
+}
+
+message StoreOAuthConsentResponse {
+  bool success = 1;
+}
 message RotateOAuthClientSecretResponse {
   string client_secret = 1;
 }

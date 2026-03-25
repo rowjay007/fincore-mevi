@@ -323,6 +323,44 @@ func (s *Server) RotateOAuthClientSecret(ctx context.Context, req *authv1.Rotate
 	return &authv1.RotateOAuthClientSecretResponse{ClientSecret: secret}, nil
 }
 
+func (s *Server) GetOAuthConsent(ctx context.Context, req *authv1.GetOAuthConsentRequest) (*authv1.GetOAuthConsentResponse, error) {
+	userID := strings.TrimSpace(req.UserId)
+	clientID := strings.TrimSpace(req.ClientId)
+	if userID == "" || clientID == "" {
+		return nil, invalidArg("user_id and client_id required")
+	}
+
+	var scopes []string
+	err := s.db.QueryRow(ctx, `select scopes from oauth_consents where user_id = $1 and client_id = $2`, userID, clientID).Scan(&scopes)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &authv1.GetOAuthConsentResponse{Scopes: nil}, nil
+		}
+		return nil, internal(err)
+	}
+	return &authv1.GetOAuthConsentResponse{Scopes: scopes}, nil
+}
+
+func (s *Server) StoreOAuthConsent(ctx context.Context, req *authv1.StoreOAuthConsentRequest) (*authv1.StoreOAuthConsentResponse, error) {
+	userID := strings.TrimSpace(req.UserId)
+	clientID := strings.TrimSpace(req.ClientId)
+	if userID == "" || clientID == "" {
+		return nil, invalidArg("user_id and client_id required")
+	}
+
+	_, err := s.db.Exec(ctx, `
+		insert into oauth_consents (user_id, client_id, scopes, updated_at)
+		values ($1, $2, $3, now())
+		on conflict (user_id, client_id) do update
+		set scopes = excluded.scopes, updated_at = now()
+	`, userID, clientID, req.Scopes)
+	if err != nil {
+		return nil, internal(err)
+	}
+
+	return &authv1.StoreOAuthConsentResponse{Success: true}, nil
+}
+
 func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeRequest) (*authv1.OAuthAuthorizeResponse, error) {
 	if strings.TrimSpace(req.ResponseType) != "code" {
 		return nil, invalidArg("unsupported response_type")

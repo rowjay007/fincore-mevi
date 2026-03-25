@@ -14,15 +14,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	authv1 "fincore/gen/go/auth/v1"
@@ -101,41 +100,43 @@ var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype
 </html>`))
 
 type browserSessionStore struct {
-	mu       sync.Mutex
-	sessions map[string]browserSession
-	ttl      time.Duration
+	db  *pgxpool.Pool
+	ttl time.Duration
 }
 
 type browserSession struct {
+	UserID      string
 	AccessToken string
 	ExpiresAt   time.Time
 }
 
-func newBrowserSessionStore(ttl time.Duration) *browserSessionStore {
+func newBrowserSessionStore(db *pgxpool.Pool, ttl time.Duration) *browserSessionStore {
 	if ttl <= 0 {
 		ttl = 30 * time.Minute
 	}
-	return &browserSessionStore{sessions: map[string]browserSession{}, ttl: ttl}
+	return &browserSessionStore{db: db, ttl: ttl}
 }
 
-func (s *browserSessionStore) get(sessionID string) (browserSession, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *browserSessionStore) get(ctx context.Context, sessionID string) (browserSession, bool) {
+	if s == nil || s.db == nil {
+		return browserSession{}, false
+	}
 	if strings.TrimSpace(sessionID) == "" {
 		return browserSession{}, false
 	}
-	ss, ok := s.sessions[sessionID]
-	if !ok {
-		return browserSession{}, false
-	}
-	if time.Now().UTC().After(ss.ExpiresAt.UTC()) {
-		delete(s.sessions, sessionID)
+	var ss browserSession
+	err := s.db.QueryRow(ctx, `select user_id, access_token, expires_at from browser_sessions where id = $1 and expires_at > now()`, sessionID).
+		Scan(&ss.UserID, &ss.AccessToken, &ss.ExpiresAt)
+	if err != nil {
 		return browserSession{}, false
 	}
 	return ss, true
 }
 
-func (s *browserSessionStore) put(accessToken string) (string, browserSession, bool) {
+func (s *browserSessionStore) put(ctx context.Context, userID string, accessToken string) (string, browserSession, bool) {
+	if s == nil || s.db == nil {
+		return "", browserSession{}, false
+	}
 	accessToken = strings.TrimSpace(accessToken)
 	if accessToken == "" {
 		return "", browserSession{}, false
@@ -144,20 +145,22 @@ func (s *browserSessionStore) put(accessToken string) (string, browserSession, b
 	if err != nil {
 		return "", browserSession{}, false
 	}
-	ss := browserSession{AccessToken: accessToken, ExpiresAt: time.Now().UTC().Add(s.ttl)}
-	s.mu.Lock()
-	s.sessions[id] = ss
-	s.mu.Unlock()
-	return id, ss, true
+	expiresAt := time.Now().UTC().Add(s.ttl)
+	_, err = s.db.Exec(ctx, `insert into browser_sessions (id, user_id, access_token, expires_at) values ($1, $2, $3, $4)`, id, userID, accessToken, expiresAt)
+	if err != nil {
+		return "", browserSession{}, false
+	}
+	return id, browserSession{UserID: userID, AccessToken: accessToken, ExpiresAt: expiresAt}, true
 }
 
-func (s *browserSessionStore) del(sessionID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *browserSessionStore) del(ctx context.Context, sessionID string) {
+	if s == nil || s.db == nil {
+		return
+	}
 	if strings.TrimSpace(sessionID) == "" {
 		return
 	}
-	delete(s.sessions, sessionID)
+	_, _ = s.db.Exec(ctx, `delete from browser_sessions where id = $1`, sessionID)
 }
 
 func randomB64URL(n int) (string, error) {
@@ -169,6 +172,28 @@ func randomB64URL(n int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func splitScopes(scope string) []string {
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return nil
+	}
+	parts := strings.Fields(scope)
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
 }
 
 func oauth2ErrorRedirect(redirectURI string, state string, code string, desc string) (string, bool) {
@@ -220,16 +245,16 @@ func oauth2ErrorFromGRPC(err error) (code string, desc string) {
 	}
 }
 
-func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string) *http.ServeMux {
+func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string, pool *pgxpool.Pool) *http.ServeMux {
 	h := http.NewServeMux()
-	store := newBrowserSessionStore(30 * time.Minute)
+	store := newBrowserSessionStore(pool, 30*time.Minute)
 	const sessionCookieName = "fincore_authorize_session"
 	const csrfCookieName = "fincore_authorize_csrf"
 	h.Handle("/", gw)
 	h.HandleFunc("/oauth/logout", func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(sessionCookieName)
 		if err == nil {
-			store.del(c.Value)
+			store.del(r.Context(), c.Value)
 		}
 		http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 		w.WriteHeader(http.StatusNoContent)
@@ -246,7 +271,7 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 		if c, err := r.Cookie(sessionCookieName); err == nil {
 			sessionID = strings.TrimSpace(c.Value)
 		}
-		sess, hasSession := store.get(sessionID)
+		sess, hasSession := store.get(r.Context(), sessionID)
 
 		q := r.URL.Query()
 		data := authorizePageData{
@@ -290,6 +315,51 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 					data.Error = "code_challenge_method must be S256"
 				}
 			}
+
+			// If logged in, check for existing consent.
+			if hasSession && data.Error == "" {
+				res, err := authClient.GetOAuthConsent(r.Context(), &authv1.GetOAuthConsentRequest{
+					UserId:   sess.UserID,
+					ClientId: data.ClientID,
+				})
+				if err == nil && res != nil && len(res.Scopes) > 0 {
+					requested := splitScopes(data.Scope)
+					granted := map[string]bool{}
+					for _, s := range res.Scopes {
+						granted[s] = true
+					}
+					allGranted := true
+					for _, s := range requested {
+						if !granted[s] {
+							allGranted = false
+							break
+						}
+					}
+
+					if allGranted {
+						resp, err := authClient.OAuthAuthorize(r.Context(), &authv1.OAuthAuthorizeRequest{
+							ResponseType:        "code",
+							ClientId:            data.ClientID,
+							RedirectUri:         data.RedirectURI,
+							Scope:               data.Scope,
+							State:               data.State,
+							CodeChallenge:       data.CodeChallenge,
+							CodeChallengeMethod: data.CodeChallengeMethod,
+						})
+						if err != nil {
+							code, desc := oauth2ErrorFromGRPC(err)
+							if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, code, desc); ok {
+								http.Redirect(w, r, loc, http.StatusFound)
+								return
+							}
+						} else {
+							http.Redirect(w, r, resp.RedirectUrl, http.StatusFound)
+							return
+						}
+					}
+				}
+			}
+
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_ = authorizePageTmpl.Execute(w, data)
 			return
@@ -326,49 +396,70 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 				return
 			}
 
-			email := strings.TrimSpace(r.Form.Get("email"))
-			password := r.Form.Get("password")
-			approve := strings.TrimSpace(r.Form.Get("approve"))
-			if approve != "yes" {
-				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "access_denied", "approval required"); ok {
+			if r.FormValue("approve") != "yes" {
+				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "access_denied", "user rejected request"); ok {
 					http.Redirect(w, r, loc, http.StatusFound)
 					return
 				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				data.Error = "approval required"
-				_ = authorizePageTmpl.Execute(w, data)
-				return
-			}
-			if !hasSession && (email == "" || password == "") {
-				if loc, ok := oauth2ErrorRedirect(data.RedirectURI, data.State, "invalid_request", "email and password required"); ok {
-					http.Redirect(w, r, loc, http.StatusFound)
-					return
-				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				data.Error = "email and password required"
-				_ = authorizePageTmpl.Execute(w, data)
+				http.Error(w, "access denied", http.StatusForbidden)
 				return
 			}
 
-			accessToken := ""
+			email := strings.TrimSpace(r.FormValue("email"))
+			password := strings.TrimSpace(r.FormValue("password"))
+
+			var userID string
 			if hasSession {
-				accessToken = sess.AccessToken
+				userID = sess.UserID
 			} else {
-				loginRes, err := authClient.Login(r.Context(), &authv1.LoginRequest{Email: email, Password: password})
+				loginRes, err := authClient.Login(r.Context(), &authv1.LoginRequest{
+					Email:    email,
+					Password: password,
+				})
 				if err != nil {
-					w.Header().Set("Content-Type", "text/html; charset=utf-8")
-					data.Error = "login failed"
+					data.Error = "Invalid email or password"
 					_ = authorizePageTmpl.Execute(w, data)
 					return
 				}
-				accessToken = loginRes.AccessToken
-				newID, _, ok := store.put(accessToken)
-				if ok {
-					http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: newID, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil})
+				// Extract userID from the token without verification if we trust the auth-service.
+				parts := strings.Split(loginRes.AccessToken, ".")
+				if len(parts) == 3 {
+					payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+					if err == nil {
+						var p struct {
+							UserID string `json:"user_id"`
+						}
+						_ = json.Unmarshal(payloadBytes, &p)
+						userID = p.UserID
+					}
 				}
+
+				if userID == "" {
+					data.Error = "Login failed"
+					_ = authorizePageTmpl.Execute(w, data)
+					return
+				}
+
+				sessionID, _, _ = store.put(r.Context(), userID, loginRes.AccessToken)
+				http.SetCookie(w, &http.Cookie{
+					Name:     sessionCookieName,
+					Value:    sessionID,
+					Path:     "/",
+					HttpOnly: true,
+					SameSite: http.SameSiteLaxMode,
+					Secure:   r.TLS != nil,
+				})
 			}
-			authCtx := metadata.NewOutgoingContext(r.Context(), metadata.Pairs("authorization", "Bearer "+accessToken))
-			res, err := authClient.OAuthAuthorize(authCtx, &authv1.OAuthAuthorizeRequest{
+
+			// Store consent
+			_, _ = authClient.StoreOAuthConsent(r.Context(), &authv1.StoreOAuthConsentRequest{
+				UserId:   userID,
+				ClientId: data.ClientID,
+				Scopes:   splitScopes(data.Scope),
+			})
+
+			// Issue code
+			resp, err := authClient.OAuthAuthorize(r.Context(), &authv1.OAuthAuthorizeRequest{
 				ResponseType:        "code",
 				ClientId:            data.ClientID,
 				RedirectUri:         data.RedirectURI,
@@ -383,13 +474,10 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 					http.Redirect(w, r, loc, http.StatusFound)
 					return
 				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				data.Error = "authorize failed"
-				_ = authorizePageTmpl.Execute(w, data)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			http.Redirect(w, r, res.RedirectUrl, http.StatusFound)
-			return
+			http.Redirect(w, r, resp.RedirectUrl, http.StatusFound)
 		default:
 			w.Header().Set("Allow", "GET, POST")
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -645,7 +733,7 @@ func main() {
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
 	}
 
-	h := newHTTPHandler(mux, authClient, cfg, jwks, jwksPath)
+	h := newHTTPHandler(mux, authClient, cfg, jwks, jwksPath, pool)
 
 	log.Printf("Starting HTTP gateway on %s", httpAddr)
 	if err := http.ListenAndServe(httpAddr, h); err != nil {

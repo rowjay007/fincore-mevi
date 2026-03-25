@@ -35,6 +35,8 @@ const (
 	AuthService_ListOAuthClients_FullMethodName        = "/fincore.auth.v1.AuthService/ListOAuthClients"
 	AuthService_DeleteOAuthClient_FullMethodName       = "/fincore.auth.v1.AuthService/DeleteOAuthClient"
 	AuthService_RotateOAuthClientSecret_FullMethodName = "/fincore.auth.v1.AuthService/RotateOAuthClientSecret"
+	AuthService_GetOAuthConsent_FullMethodName         = "/fincore.auth.v1.AuthService/GetOAuthConsent"
+	AuthService_StoreOAuthConsent_FullMethodName       = "/fincore.auth.v1.AuthService/StoreOAuthConsent"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -57,6 +59,8 @@ type AuthServiceClient interface {
 	ListOAuthClients(ctx context.Context, in *ListOAuthClientsRequest, opts ...grpc.CallOption) (*ListOAuthClientsResponse, error)
 	DeleteOAuthClient(ctx context.Context, in *DeleteOAuthClientRequest, opts ...grpc.CallOption) (*DeleteOAuthClientResponse, error)
 	RotateOAuthClientSecret(ctx context.Context, in *RotateOAuthClientSecretRequest, opts ...grpc.CallOption) (*RotateOAuthClientSecretResponse, error)
+	GetOAuthConsent(ctx context.Context, in *GetOAuthConsentRequest, opts ...grpc.CallOption) (*GetOAuthConsentResponse, error)
+	StoreOAuthConsent(ctx context.Context, in *StoreOAuthConsentRequest, opts ...grpc.CallOption) (*StoreOAuthConsentResponse, error)
 }
 
 type authServiceClient struct {
@@ -227,6 +231,26 @@ func (c *authServiceClient) RotateOAuthClientSecret(ctx context.Context, in *Rot
 	return out, nil
 }
 
+func (c *authServiceClient) GetOAuthConsent(ctx context.Context, in *GetOAuthConsentRequest, opts ...grpc.CallOption) (*GetOAuthConsentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOAuthConsentResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetOAuthConsent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) StoreOAuthConsent(ctx context.Context, in *StoreOAuthConsentRequest, opts ...grpc.CallOption) (*StoreOAuthConsentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StoreOAuthConsentResponse)
+	err := c.cc.Invoke(ctx, AuthService_StoreOAuthConsent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -247,6 +271,8 @@ type AuthServiceServer interface {
 	ListOAuthClients(context.Context, *ListOAuthClientsRequest) (*ListOAuthClientsResponse, error)
 	DeleteOAuthClient(context.Context, *DeleteOAuthClientRequest) (*DeleteOAuthClientResponse, error)
 	RotateOAuthClientSecret(context.Context, *RotateOAuthClientSecretRequest) (*RotateOAuthClientSecretResponse, error)
+	GetOAuthConsent(context.Context, *GetOAuthConsentRequest) (*GetOAuthConsentResponse, error)
+	StoreOAuthConsent(context.Context, *StoreOAuthConsentRequest) (*StoreOAuthConsentResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -304,6 +330,12 @@ func (UnimplementedAuthServiceServer) DeleteOAuthClient(context.Context, *Delete
 }
 func (UnimplementedAuthServiceServer) RotateOAuthClientSecret(context.Context, *RotateOAuthClientSecretRequest) (*RotateOAuthClientSecretResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RotateOAuthClientSecret not implemented")
+}
+func (UnimplementedAuthServiceServer) GetOAuthConsent(context.Context, *GetOAuthConsentRequest) (*GetOAuthConsentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOAuthConsent not implemented")
+}
+func (UnimplementedAuthServiceServer) StoreOAuthConsent(context.Context, *StoreOAuthConsentRequest) (*StoreOAuthConsentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StoreOAuthConsent not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -614,6 +646,42 @@ func _AuthService_RotateOAuthClientSecret_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_GetOAuthConsent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOAuthConsentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetOAuthConsent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetOAuthConsent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetOAuthConsent(ctx, req.(*GetOAuthConsentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_StoreOAuthConsent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreOAuthConsentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).StoreOAuthConsent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_StoreOAuthConsent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).StoreOAuthConsent(ctx, req.(*StoreOAuthConsentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -684,6 +752,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RotateOAuthClientSecret",
 			Handler:    _AuthService_RotateOAuthClientSecret_Handler,
+		},
+		{
+			MethodName: "GetOAuthConsent",
+			Handler:    _AuthService_GetOAuthConsent_Handler,
+		},
+		{
+			MethodName: "StoreOAuthConsent",
+			Handler:    _AuthService_StoreOAuthConsent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
