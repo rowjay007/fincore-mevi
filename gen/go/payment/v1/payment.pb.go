@@ -206,6 +206,326 @@ func (x *InitiatePaymentResponse) GetStatus() PaymentStatus {
 	return PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
 }
 
+type AuthorizePaymentRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId      string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AuthorizePaymentRequest) Reset() {
+	*x = AuthorizePaymentRequest{}
+	mi := &file_payment_v1_payment_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizePaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizePaymentRequest) ProtoMessage() {}
+
+func (x *AuthorizePaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_payment_v1_payment_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorizePaymentRequest.ProtoReflect.Descriptor instead.
+func (*AuthorizePaymentRequest) Descriptor() ([]byte, []int) {
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AuthorizePaymentRequest) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *AuthorizePaymentRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type AuthorizePaymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId     string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	Status        PaymentStatus          `protobuf:"varint,2,opt,name=status,proto3,enum=fincore.payment.v1.PaymentStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthorizePaymentResponse) Reset() {
+	*x = AuthorizePaymentResponse{}
+	mi := &file_payment_v1_payment_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizePaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizePaymentResponse) ProtoMessage() {}
+
+func (x *AuthorizePaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_payment_v1_payment_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorizePaymentResponse.ProtoReflect.Descriptor instead.
+func (*AuthorizePaymentResponse) Descriptor() ([]byte, []int) {
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AuthorizePaymentResponse) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *AuthorizePaymentResponse) GetStatus() PaymentStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
+}
+
+type SettlePaymentRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId      string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SettlePaymentRequest) Reset() {
+	*x = SettlePaymentRequest{}
+	mi := &file_payment_v1_payment_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SettlePaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SettlePaymentRequest) ProtoMessage() {}
+
+func (x *SettlePaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_payment_v1_payment_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SettlePaymentRequest.ProtoReflect.Descriptor instead.
+func (*SettlePaymentRequest) Descriptor() ([]byte, []int) {
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SettlePaymentRequest) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *SettlePaymentRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type SettlePaymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId     string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	Status        PaymentStatus          `protobuf:"varint,2,opt,name=status,proto3,enum=fincore.payment.v1.PaymentStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SettlePaymentResponse) Reset() {
+	*x = SettlePaymentResponse{}
+	mi := &file_payment_v1_payment_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SettlePaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SettlePaymentResponse) ProtoMessage() {}
+
+func (x *SettlePaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_payment_v1_payment_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SettlePaymentResponse.ProtoReflect.Descriptor instead.
+func (*SettlePaymentResponse) Descriptor() ([]byte, []int) {
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SettlePaymentResponse) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *SettlePaymentResponse) GetStatus() PaymentStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
+}
+
+type FailPaymentRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId      string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Reason         string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *FailPaymentRequest) Reset() {
+	*x = FailPaymentRequest{}
+	mi := &file_payment_v1_payment_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FailPaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FailPaymentRequest) ProtoMessage() {}
+
+func (x *FailPaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_payment_v1_payment_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FailPaymentRequest.ProtoReflect.Descriptor instead.
+func (*FailPaymentRequest) Descriptor() ([]byte, []int) {
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *FailPaymentRequest) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *FailPaymentRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *FailPaymentRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type FailPaymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId     string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	Status        PaymentStatus          `protobuf:"varint,2,opt,name=status,proto3,enum=fincore.payment.v1.PaymentStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FailPaymentResponse) Reset() {
+	*x = FailPaymentResponse{}
+	mi := &file_payment_v1_payment_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FailPaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FailPaymentResponse) ProtoMessage() {}
+
+func (x *FailPaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_payment_v1_payment_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FailPaymentResponse.ProtoReflect.Descriptor instead.
+func (*FailPaymentResponse) Descriptor() ([]byte, []int) {
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *FailPaymentResponse) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *FailPaymentResponse) GetStatus() PaymentStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
+}
+
 type GetPaymentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PaymentId     string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
@@ -215,7 +535,7 @@ type GetPaymentRequest struct {
 
 func (x *GetPaymentRequest) Reset() {
 	*x = GetPaymentRequest{}
-	mi := &file_payment_v1_payment_proto_msgTypes[2]
+	mi := &file_payment_v1_payment_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -227,7 +547,7 @@ func (x *GetPaymentRequest) String() string {
 func (*GetPaymentRequest) ProtoMessage() {}
 
 func (x *GetPaymentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_v1_payment_proto_msgTypes[2]
+	mi := &file_payment_v1_payment_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -240,7 +560,7 @@ func (x *GetPaymentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPaymentRequest.ProtoReflect.Descriptor instead.
 func (*GetPaymentRequest) Descriptor() ([]byte, []int) {
-	return file_payment_v1_payment_proto_rawDescGZIP(), []int{2}
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetPaymentRequest) GetPaymentId() string {
@@ -265,7 +585,7 @@ type Payment struct {
 
 func (x *Payment) Reset() {
 	*x = Payment{}
-	mi := &file_payment_v1_payment_proto_msgTypes[3]
+	mi := &file_payment_v1_payment_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -277,7 +597,7 @@ func (x *Payment) String() string {
 func (*Payment) ProtoMessage() {}
 
 func (x *Payment) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_v1_payment_proto_msgTypes[3]
+	mi := &file_payment_v1_payment_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -290,7 +610,7 @@ func (x *Payment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Payment.ProtoReflect.Descriptor instead.
 func (*Payment) Descriptor() ([]byte, []int) {
-	return file_payment_v1_payment_proto_rawDescGZIP(), []int{3}
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Payment) GetPaymentId() string {
@@ -351,7 +671,7 @@ type GetPaymentResponse struct {
 
 func (x *GetPaymentResponse) Reset() {
 	*x = GetPaymentResponse{}
-	mi := &file_payment_v1_payment_proto_msgTypes[4]
+	mi := &file_payment_v1_payment_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -363,7 +683,7 @@ func (x *GetPaymentResponse) String() string {
 func (*GetPaymentResponse) ProtoMessage() {}
 
 func (x *GetPaymentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_v1_payment_proto_msgTypes[4]
+	mi := &file_payment_v1_payment_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -376,7 +696,7 @@ func (x *GetPaymentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPaymentResponse.ProtoReflect.Descriptor instead.
 func (*GetPaymentResponse) Descriptor() ([]byte, []int) {
-	return file_payment_v1_payment_proto_rawDescGZIP(), []int{4}
+	return file_payment_v1_payment_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetPaymentResponse) GetPayment() *Payment {
@@ -400,6 +720,31 @@ const file_payment_v1_payment_proto_rawDesc = "" +
 	"\x17InitiatePaymentResponse\x12\x1d\n" +
 	"\n" +
 	"payment_id\x18\x01 \x01(\tR\tpaymentId\x129\n" +
+	"\x06status\x18\x02 \x01(\x0e2!.fincore.payment.v1.PaymentStatusR\x06status\"a\n" +
+	"\x17AuthorizePaymentRequest\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\"t\n" +
+	"\x18AuthorizePaymentResponse\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\x129\n" +
+	"\x06status\x18\x02 \x01(\x0e2!.fincore.payment.v1.PaymentStatusR\x06status\"^\n" +
+	"\x14SettlePaymentRequest\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\"q\n" +
+	"\x15SettlePaymentResponse\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\x129\n" +
+	"\x06status\x18\x02 \x01(\x0e2!.fincore.payment.v1.PaymentStatusR\x06status\"t\n" +
+	"\x12FailPaymentRequest\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"o\n" +
+	"\x13FailPaymentResponse\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\x129\n" +
 	"\x06status\x18\x02 \x01(\x0e2!.fincore.payment.v1.PaymentStatusR\x06status\"2\n" +
 	"\x11GetPaymentRequest\x12\x1d\n" +
 	"\n" +
@@ -420,9 +765,12 @@ const file_payment_v1_payment_proto_rawDesc = "" +
 	"\x18PAYMENT_STATUS_INITIATED\x10\x01\x12\x1d\n" +
 	"\x19PAYMENT_STATUS_AUTHORIZED\x10\x02\x12\x1a\n" +
 	"\x16PAYMENT_STATUS_SETTLED\x10\x03\x12\x19\n" +
-	"\x15PAYMENT_STATUS_FAILED\x10\x042\x96\x02\n" +
+	"\x15PAYMENT_STATUS_FAILED\x10\x042\xd6\x05\n" +
 	"\x0ePaymentService\x12\x83\x01\n" +
-	"\x0fInitiatePayment\x12*.fincore.payment.v1.InitiatePaymentRequest\x1a+.fincore.payment.v1.InitiatePaymentResponse\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/payments\x12~\n" +
+	"\x0fInitiatePayment\x12*.fincore.payment.v1.InitiatePaymentRequest\x1a+.fincore.payment.v1.InitiatePaymentResponse\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/v1/payments\x12\x9d\x01\n" +
+	"\x10AuthorizePayment\x12+.fincore.payment.v1.AuthorizePaymentRequest\x1a,.fincore.payment.v1.AuthorizePaymentResponse\".\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/payments/{payment_id}:authorize\x12\x91\x01\n" +
+	"\rSettlePayment\x12(.fincore.payment.v1.SettlePaymentRequest\x1a).fincore.payment.v1.SettlePaymentResponse\"+\x82\xd3\xe4\x93\x02%:\x01*\" /v1/payments/{payment_id}:settle\x12\x89\x01\n" +
+	"\vFailPayment\x12&.fincore.payment.v1.FailPaymentRequest\x1a'.fincore.payment.v1.FailPaymentResponse\")\x82\xd3\xe4\x93\x02#:\x01*\"\x1e/v1/payments/{payment_id}:fail\x12~\n" +
 	"\n" +
 	"GetPayment\x12%.fincore.payment.v1.GetPaymentRequest\x1a&.fincore.payment.v1.GetPaymentResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/payments/{payment_id}B%Z#fincore/gen/go/payment/v1;paymentv1b\x06proto3"
 
@@ -439,31 +787,46 @@ func file_payment_v1_payment_proto_rawDescGZIP() []byte {
 }
 
 var file_payment_v1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_payment_v1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_payment_v1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_payment_v1_payment_proto_goTypes = []any{
-	(PaymentStatus)(0),              // 0: fincore.payment.v1.PaymentStatus
-	(*InitiatePaymentRequest)(nil),  // 1: fincore.payment.v1.InitiatePaymentRequest
-	(*InitiatePaymentResponse)(nil), // 2: fincore.payment.v1.InitiatePaymentResponse
-	(*GetPaymentRequest)(nil),       // 3: fincore.payment.v1.GetPaymentRequest
-	(*Payment)(nil),                 // 4: fincore.payment.v1.Payment
-	(*GetPaymentResponse)(nil),      // 5: fincore.payment.v1.GetPaymentResponse
-	(*v1.Money)(nil),                // 6: fincore.common.v1.Money
+	(PaymentStatus)(0),               // 0: fincore.payment.v1.PaymentStatus
+	(*InitiatePaymentRequest)(nil),   // 1: fincore.payment.v1.InitiatePaymentRequest
+	(*InitiatePaymentResponse)(nil),  // 2: fincore.payment.v1.InitiatePaymentResponse
+	(*AuthorizePaymentRequest)(nil),  // 3: fincore.payment.v1.AuthorizePaymentRequest
+	(*AuthorizePaymentResponse)(nil), // 4: fincore.payment.v1.AuthorizePaymentResponse
+	(*SettlePaymentRequest)(nil),     // 5: fincore.payment.v1.SettlePaymentRequest
+	(*SettlePaymentResponse)(nil),    // 6: fincore.payment.v1.SettlePaymentResponse
+	(*FailPaymentRequest)(nil),       // 7: fincore.payment.v1.FailPaymentRequest
+	(*FailPaymentResponse)(nil),      // 8: fincore.payment.v1.FailPaymentResponse
+	(*GetPaymentRequest)(nil),        // 9: fincore.payment.v1.GetPaymentRequest
+	(*Payment)(nil),                  // 10: fincore.payment.v1.Payment
+	(*GetPaymentResponse)(nil),       // 11: fincore.payment.v1.GetPaymentResponse
+	(*v1.Money)(nil),                 // 12: fincore.common.v1.Money
 }
 var file_payment_v1_payment_proto_depIdxs = []int32{
-	6, // 0: fincore.payment.v1.InitiatePaymentRequest.amount:type_name -> fincore.common.v1.Money
-	0, // 1: fincore.payment.v1.InitiatePaymentResponse.status:type_name -> fincore.payment.v1.PaymentStatus
-	6, // 2: fincore.payment.v1.Payment.amount:type_name -> fincore.common.v1.Money
-	0, // 3: fincore.payment.v1.Payment.status:type_name -> fincore.payment.v1.PaymentStatus
-	4, // 4: fincore.payment.v1.GetPaymentResponse.payment:type_name -> fincore.payment.v1.Payment
-	1, // 5: fincore.payment.v1.PaymentService.InitiatePayment:input_type -> fincore.payment.v1.InitiatePaymentRequest
-	3, // 6: fincore.payment.v1.PaymentService.GetPayment:input_type -> fincore.payment.v1.GetPaymentRequest
-	2, // 7: fincore.payment.v1.PaymentService.InitiatePayment:output_type -> fincore.payment.v1.InitiatePaymentResponse
-	5, // 8: fincore.payment.v1.PaymentService.GetPayment:output_type -> fincore.payment.v1.GetPaymentResponse
-	7, // [7:9] is the sub-list for method output_type
-	5, // [5:7] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	12, // 0: fincore.payment.v1.InitiatePaymentRequest.amount:type_name -> fincore.common.v1.Money
+	0,  // 1: fincore.payment.v1.InitiatePaymentResponse.status:type_name -> fincore.payment.v1.PaymentStatus
+	0,  // 2: fincore.payment.v1.AuthorizePaymentResponse.status:type_name -> fincore.payment.v1.PaymentStatus
+	0,  // 3: fincore.payment.v1.SettlePaymentResponse.status:type_name -> fincore.payment.v1.PaymentStatus
+	0,  // 4: fincore.payment.v1.FailPaymentResponse.status:type_name -> fincore.payment.v1.PaymentStatus
+	12, // 5: fincore.payment.v1.Payment.amount:type_name -> fincore.common.v1.Money
+	0,  // 6: fincore.payment.v1.Payment.status:type_name -> fincore.payment.v1.PaymentStatus
+	10, // 7: fincore.payment.v1.GetPaymentResponse.payment:type_name -> fincore.payment.v1.Payment
+	1,  // 8: fincore.payment.v1.PaymentService.InitiatePayment:input_type -> fincore.payment.v1.InitiatePaymentRequest
+	3,  // 9: fincore.payment.v1.PaymentService.AuthorizePayment:input_type -> fincore.payment.v1.AuthorizePaymentRequest
+	5,  // 10: fincore.payment.v1.PaymentService.SettlePayment:input_type -> fincore.payment.v1.SettlePaymentRequest
+	7,  // 11: fincore.payment.v1.PaymentService.FailPayment:input_type -> fincore.payment.v1.FailPaymentRequest
+	9,  // 12: fincore.payment.v1.PaymentService.GetPayment:input_type -> fincore.payment.v1.GetPaymentRequest
+	2,  // 13: fincore.payment.v1.PaymentService.InitiatePayment:output_type -> fincore.payment.v1.InitiatePaymentResponse
+	4,  // 14: fincore.payment.v1.PaymentService.AuthorizePayment:output_type -> fincore.payment.v1.AuthorizePaymentResponse
+	6,  // 15: fincore.payment.v1.PaymentService.SettlePayment:output_type -> fincore.payment.v1.SettlePaymentResponse
+	8,  // 16: fincore.payment.v1.PaymentService.FailPayment:output_type -> fincore.payment.v1.FailPaymentResponse
+	11, // 17: fincore.payment.v1.PaymentService.GetPayment:output_type -> fincore.payment.v1.GetPaymentResponse
+	13, // [13:18] is the sub-list for method output_type
+	8,  // [8:13] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_payment_v1_payment_proto_init() }
@@ -477,7 +840,7 @@ func file_payment_v1_payment_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_payment_v1_payment_proto_rawDesc), len(file_payment_v1_payment_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

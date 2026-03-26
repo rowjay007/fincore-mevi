@@ -19,8 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PaymentService_InitiatePayment_FullMethodName = "/fincore.payment.v1.PaymentService/InitiatePayment"
-	PaymentService_GetPayment_FullMethodName      = "/fincore.payment.v1.PaymentService/GetPayment"
+	PaymentService_InitiatePayment_FullMethodName  = "/fincore.payment.v1.PaymentService/InitiatePayment"
+	PaymentService_AuthorizePayment_FullMethodName = "/fincore.payment.v1.PaymentService/AuthorizePayment"
+	PaymentService_SettlePayment_FullMethodName    = "/fincore.payment.v1.PaymentService/SettlePayment"
+	PaymentService_FailPayment_FullMethodName      = "/fincore.payment.v1.PaymentService/FailPayment"
+	PaymentService_GetPayment_FullMethodName       = "/fincore.payment.v1.PaymentService/GetPayment"
 )
 
 // PaymentServiceClient is the client API for PaymentService service.
@@ -28,6 +31,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PaymentServiceClient interface {
 	InitiatePayment(ctx context.Context, in *InitiatePaymentRequest, opts ...grpc.CallOption) (*InitiatePaymentResponse, error)
+	AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error)
+	SettlePayment(ctx context.Context, in *SettlePaymentRequest, opts ...grpc.CallOption) (*SettlePaymentResponse, error)
+	FailPayment(ctx context.Context, in *FailPaymentRequest, opts ...grpc.CallOption) (*FailPaymentResponse, error)
 	GetPayment(ctx context.Context, in *GetPaymentRequest, opts ...grpc.CallOption) (*GetPaymentResponse, error)
 }
 
@@ -49,6 +55,36 @@ func (c *paymentServiceClient) InitiatePayment(ctx context.Context, in *Initiate
 	return out, nil
 }
 
+func (c *paymentServiceClient) AuthorizePayment(ctx context.Context, in *AuthorizePaymentRequest, opts ...grpc.CallOption) (*AuthorizePaymentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthorizePaymentResponse)
+	err := c.cc.Invoke(ctx, PaymentService_AuthorizePayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) SettlePayment(ctx context.Context, in *SettlePaymentRequest, opts ...grpc.CallOption) (*SettlePaymentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SettlePaymentResponse)
+	err := c.cc.Invoke(ctx, PaymentService_SettlePayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) FailPayment(ctx context.Context, in *FailPaymentRequest, opts ...grpc.CallOption) (*FailPaymentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FailPaymentResponse)
+	err := c.cc.Invoke(ctx, PaymentService_FailPayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *paymentServiceClient) GetPayment(ctx context.Context, in *GetPaymentRequest, opts ...grpc.CallOption) (*GetPaymentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetPaymentResponse)
@@ -64,6 +100,9 @@ func (c *paymentServiceClient) GetPayment(ctx context.Context, in *GetPaymentReq
 // for forward compatibility.
 type PaymentServiceServer interface {
 	InitiatePayment(context.Context, *InitiatePaymentRequest) (*InitiatePaymentResponse, error)
+	AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error)
+	SettlePayment(context.Context, *SettlePaymentRequest) (*SettlePaymentResponse, error)
+	FailPayment(context.Context, *FailPaymentRequest) (*FailPaymentResponse, error)
 	GetPayment(context.Context, *GetPaymentRequest) (*GetPaymentResponse, error)
 	mustEmbedUnimplementedPaymentServiceServer()
 }
@@ -77,6 +116,15 @@ type UnimplementedPaymentServiceServer struct{}
 
 func (UnimplementedPaymentServiceServer) InitiatePayment(context.Context, *InitiatePaymentRequest) (*InitiatePaymentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InitiatePayment not implemented")
+}
+func (UnimplementedPaymentServiceServer) AuthorizePayment(context.Context, *AuthorizePaymentRequest) (*AuthorizePaymentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AuthorizePayment not implemented")
+}
+func (UnimplementedPaymentServiceServer) SettlePayment(context.Context, *SettlePaymentRequest) (*SettlePaymentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SettlePayment not implemented")
+}
+func (UnimplementedPaymentServiceServer) FailPayment(context.Context, *FailPaymentRequest) (*FailPaymentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FailPayment not implemented")
 }
 func (UnimplementedPaymentServiceServer) GetPayment(context.Context, *GetPaymentRequest) (*GetPaymentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPayment not implemented")
@@ -120,6 +168,60 @@ func _PaymentService_InitiatePayment_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PaymentService_AuthorizePayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AuthorizePaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).AuthorizePayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_AuthorizePayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).AuthorizePayment(ctx, req.(*AuthorizePaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_SettlePayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SettlePaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).SettlePayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_SettlePayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).SettlePayment(ctx, req.(*SettlePaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_FailPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FailPaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).FailPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_FailPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).FailPayment(ctx, req.(*FailPaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PaymentService_GetPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetPaymentRequest)
 	if err := dec(in); err != nil {
@@ -148,6 +250,18 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InitiatePayment",
 			Handler:    _PaymentService_InitiatePayment_Handler,
+		},
+		{
+			MethodName: "AuthorizePayment",
+			Handler:    _PaymentService_AuthorizePayment_Handler,
+		},
+		{
+			MethodName: "SettlePayment",
+			Handler:    _PaymentService_SettlePayment_Handler,
+		},
+		{
+			MethodName: "FailPayment",
+			Handler:    _PaymentService_FailPayment_Handler,
 		},
 		{
 			MethodName: "GetPayment",

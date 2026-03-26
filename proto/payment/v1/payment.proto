@@ -15,10 +15,29 @@ service PaymentService {
     };
   }
 
-  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {
+  rpc AuthorizePayment(AuthorizePaymentRequest) returns (AuthorizePaymentResponse) {
     option (google.api.http) = {
-      get: "/v1/payments/{payment_id}"
+      post: "/v1/payments/{payment_id}:authorize"
+      body: "*"
     };
+  }
+
+  rpc SettlePayment(SettlePaymentRequest) returns (SettlePaymentResponse) {
+    option (google.api.http) = {
+      post: "/v1/payments/{payment_id}:settle"
+      body: "*"
+    };
+  }
+
+  rpc FailPayment(FailPaymentRequest) returns (FailPaymentResponse) {
+    option (google.api.http) = {
+      post: "/v1/payments/{payment_id}:fail"
+      body: "*"
+    };
+  }
+
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {
+    option (google.api.http) = {get: "/v1/payments/{payment_id}"};
   }
 }
 
@@ -39,6 +58,37 @@ message InitiatePaymentRequest {
 }
 
 message InitiatePaymentResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+message AuthorizePaymentRequest {
+  string payment_id = 1;
+  string idempotency_key = 2;
+}
+
+message AuthorizePaymentResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+message SettlePaymentRequest {
+  string payment_id = 1;
+  string idempotency_key = 2;
+}
+
+message SettlePaymentResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+message FailPaymentRequest {
+  string payment_id = 1;
+  string idempotency_key = 2;
+  string reason = 3;
+}
+
+message FailPaymentResponse {
   string payment_id = 1;
   PaymentStatus status = 2;
 }

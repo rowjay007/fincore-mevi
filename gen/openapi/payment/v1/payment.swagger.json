@@ -77,9 +77,150 @@
           "PaymentService"
         ]
       }
+    },
+    "/v1/payments/{paymentId}:authorize": {
+      "post": {
+        "operationId": "PaymentService_AuthorizePayment",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AuthorizePaymentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PaymentServiceAuthorizePaymentBody"
+            }
+          }
+        ],
+        "tags": [
+          "PaymentService"
+        ]
+      }
+    },
+    "/v1/payments/{paymentId}:fail": {
+      "post": {
+        "operationId": "PaymentService_FailPayment",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1FailPaymentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PaymentServiceFailPaymentBody"
+            }
+          }
+        ],
+        "tags": [
+          "PaymentService"
+        ]
+      }
+    },
+    "/v1/payments/{paymentId}:settle": {
+      "post": {
+        "operationId": "PaymentService_SettlePayment",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SettlePaymentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/PaymentServiceSettlePaymentBody"
+            }
+          }
+        ],
+        "tags": [
+          "PaymentService"
+        ]
+      }
     }
   },
   "definitions": {
+    "PaymentServiceAuthorizePaymentBody": {
+      "type": "object",
+      "properties": {
+        "idempotencyKey": {
+          "type": "string"
+        }
+      }
+    },
+    "PaymentServiceFailPaymentBody": {
+      "type": "object",
+      "properties": {
+        "idempotencyKey": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "PaymentServiceSettlePaymentBody": {
+      "type": "object",
+      "properties": {
+        "idempotencyKey": {
+          "type": "string"
+        }
+      }
+    },
     "protobufAny": {
       "type": "object",
       "properties": {
@@ -105,6 +246,28 @@
             "type": "object",
             "$ref": "#/definitions/protobufAny"
           }
+        }
+      }
+    },
+    "v1AuthorizePaymentResponse": {
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/v1PaymentStatus"
+        }
+      }
+    },
+    "v1FailPaymentResponse": {
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/v1PaymentStatus"
         }
       }
     },
@@ -197,6 +360,17 @@
         "PAYMENT_STATUS_FAILED"
       ],
       "default": "PAYMENT_STATUS_UNSPECIFIED"
+    },
+    "v1SettlePaymentResponse": {
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/v1PaymentStatus"
+        }
+      }
     }
   }
 }

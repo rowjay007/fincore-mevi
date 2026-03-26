@@ -11,10 +11,23 @@ import (
 	"fincore/pkg/money"
 	"fincore/services/payment-service/application/commands"
 	"fincore/services/payment-service/application/ports"
+	"fincore/services/payment-service/domain"
 )
 
 type InitiateHandler interface {
 	Handle(ctx context.Context, cmd commands.InitiatePayment) (*commands.InitiatePaymentResult, error)
+}
+
+type AuthorizeHandler interface {
+	Handle(ctx context.Context, cmd commands.AuthorizePayment) (*commands.AuthorizePaymentResult, error)
+}
+
+type SettleHandler interface {
+	Handle(ctx context.Context, cmd commands.SettlePayment) (*commands.SettlePaymentResult, error)
+}
+
+type FailHandler interface {
+	Handle(ctx context.Context, cmd commands.FailPayment) (*commands.FailPaymentResult, error)
 }
 
 type PaymentQuery interface {
@@ -23,12 +36,15 @@ type PaymentQuery interface {
 
 type Server struct {
 	paymentv1.UnimplementedPaymentServiceServer
-	initiate InitiateHandler
-	q        PaymentQuery
+	initiate  InitiateHandler
+	authorize AuthorizeHandler
+	settle    SettleHandler
+	fail      FailHandler
+	q         PaymentQuery
 }
 
-func NewServer(initiate InitiateHandler, q PaymentQuery) *Server {
-	return &Server{initiate: initiate, q: q}
+func NewServer(initiate InitiateHandler, authorize AuthorizeHandler, settle SettleHandler, fail FailHandler, q PaymentQuery) *Server {
+	return &Server{initiate: initiate, authorize: authorize, settle: settle, fail: fail, q: q}
 }
 
 func (s *Server) InitiatePayment(ctx context.Context, req *paymentv1.InitiatePaymentRequest) (*paymentv1.InitiatePaymentResponse, error) {
@@ -62,7 +78,58 @@ func (s *Server) InitiatePayment(ctx context.Context, req *paymentv1.InitiatePay
 	if err != nil {
 		return nil, err
 	}
-	return &paymentv1.InitiatePaymentResponse{PaymentId: res.PaymentID.String(), Status: toProtoStatus(res.Status)}, nil
+	return &paymentv1.InitiatePaymentResponse{PaymentId: res.PaymentID.String(), Status: toProtoStatusString(string(res.Status))}, nil
+}
+
+func (s *Server) AuthorizePayment(ctx context.Context, req *paymentv1.AuthorizePaymentRequest) (*paymentv1.AuthorizePaymentResponse, error) {
+	if req == nil {
+		return nil, errors.New("request required")
+	}
+	if strings.TrimSpace(req.PaymentId) == "" {
+		return nil, errors.New("payment_id required")
+	}
+	if strings.TrimSpace(req.IdempotencyKey) == "" {
+		return nil, errors.New("idempotency_key required")
+	}
+	res, err := s.authorize.Handle(ctx, commands.AuthorizePayment{PaymentID: ids.ID(req.PaymentId), IdempotencyKey: req.IdempotencyKey})
+	if err != nil {
+		return nil, err
+	}
+	return &paymentv1.AuthorizePaymentResponse{PaymentId: res.PaymentID.String(), Status: toProtoStatusString(string(res.Status))}, nil
+}
+
+func (s *Server) SettlePayment(ctx context.Context, req *paymentv1.SettlePaymentRequest) (*paymentv1.SettlePaymentResponse, error) {
+	if req == nil {
+		return nil, errors.New("request required")
+	}
+	if strings.TrimSpace(req.PaymentId) == "" {
+		return nil, errors.New("payment_id required")
+	}
+	if strings.TrimSpace(req.IdempotencyKey) == "" {
+		return nil, errors.New("idempotency_key required")
+	}
+	res, err := s.settle.Handle(ctx, commands.SettlePayment{PaymentID: ids.ID(req.PaymentId), IdempotencyKey: req.IdempotencyKey})
+	if err != nil {
+		return nil, err
+	}
+	return &paymentv1.SettlePaymentResponse{PaymentId: res.PaymentID.String(), Status: toProtoStatusString(string(res.Status))}, nil
+}
+
+func (s *Server) FailPayment(ctx context.Context, req *paymentv1.FailPaymentRequest) (*paymentv1.FailPaymentResponse, error) {
+	if req == nil {
+		return nil, errors.New("request required")
+	}
+	if strings.TrimSpace(req.PaymentId) == "" {
+		return nil, errors.New("payment_id required")
+	}
+	if strings.TrimSpace(req.IdempotencyKey) == "" {
+		return nil, errors.New("idempotency_key required")
+	}
+	res, err := s.fail.Handle(ctx, commands.FailPayment{PaymentID: ids.ID(req.PaymentId), IdempotencyKey: req.IdempotencyKey, Reason: req.Reason})
+	if err != nil {
+		return nil, err
+	}
+	return &paymentv1.FailPaymentResponse{PaymentId: res.PaymentID.String(), Status: toProtoStatusString(string(res.Status))}, nil
 }
 
 func (s *Server) GetPayment(ctx context.Context, req *paymentv1.GetPaymentRequest) (*paymentv1.GetPaymentResponse, error) {
@@ -86,17 +153,22 @@ func (s *Server) GetPayment(ctx context.Context, req *paymentv1.GetPaymentReques
 		ToAccountId:   p.ToAccountID,
 		Amount:        &commonv1.Money{Currency: p.Currency, AmountKobo: p.AmountKobo},
 		Narration:     p.Narration,
-		Status:        toProtoStatusString(p.Status),
-		Version:       p.Version,
+		Status: func() paymentv1.PaymentStatus {
+			switch p.Status {
+			case string(domain.StatusInitiated):
+				return paymentv1.PaymentStatus_PAYMENT_STATUS_INITIATED
+			case string(domain.StatusAuthorized):
+				return paymentv1.PaymentStatus_PAYMENT_STATUS_AUTHORIZED
+			case string(domain.StatusSettled):
+				return paymentv1.PaymentStatus_PAYMENT_STATUS_SETTLED
+			case string(domain.StatusFailed):
+				return paymentv1.PaymentStatus_PAYMENT_STATUS_FAILED
+			default:
+				return paymentv1.PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
+			}
+		}(),
+		Version: p.Version,
 	}}, nil
-}
-
-func toProtoStatus(s any) paymentv1.PaymentStatus {
-	sStr, _ := s.(interface{ String() string })
-	if sStr != nil {
-		return toProtoStatusString(sStr.String())
-	}
-	return paymentv1.PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
 }
 
 func toProtoStatusString(s string) paymentv1.PaymentStatus {

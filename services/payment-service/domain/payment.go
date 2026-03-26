@@ -30,6 +30,31 @@ type PaymentInitiated struct {
 func (e PaymentInitiated) EventType() string        { return "payment.initiated.v1" }
 func (e PaymentInitiated) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
 
+type PaymentAuthorized struct {
+	PaymentID  ids.ID    `json:"payment_id"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+func (e PaymentAuthorized) EventType() string        { return "payment.authorized.v1" }
+func (e PaymentAuthorized) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
+
+type PaymentSettled struct {
+	PaymentID  ids.ID    `json:"payment_id"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+func (e PaymentSettled) EventType() string        { return "payment.settled.v1" }
+func (e PaymentSettled) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
+
+type PaymentFailed struct {
+	PaymentID  ids.ID    `json:"payment_id"`
+	Reason     string    `json:"reason"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+func (e PaymentFailed) EventType() string        { return "payment.failed.v1" }
+func (e PaymentFailed) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
+
 type Payment struct {
 	id            ids.ID
 	fromAccountID ids.ID
@@ -63,6 +88,34 @@ func (p *Payment) ID() ids.ID     { return p.id }
 func (p *Payment) Status() Status { return p.status }
 func (p *Payment) Version() int64 { return p.version }
 
+func (p *Payment) Authorize() error {
+	if p.status != StatusInitiated {
+		return errors.New("payment not in initiated state")
+	}
+	p.raise(PaymentAuthorized{PaymentID: p.id, OccurredAt: time.Now().UTC()})
+	return nil
+}
+
+func (p *Payment) Settle() error {
+	if p.status != StatusAuthorized {
+		return errors.New("payment not in authorized state")
+	}
+	p.raise(PaymentSettled{PaymentID: p.id, OccurredAt: time.Now().UTC()})
+	return nil
+}
+
+func (p *Payment) Fail(reason string) error {
+	if p.status == StatusSettled {
+		return errors.New("cannot fail a settled payment")
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "failed"
+	}
+	p.raise(PaymentFailed{PaymentID: p.id, Reason: reason, OccurredAt: time.Now().UTC()})
+	return nil
+}
+
 func (p *Payment) Apply(e any) error {
 	switch ev := e.(type) {
 	case PaymentInitiated:
@@ -72,6 +125,18 @@ func (p *Payment) Apply(e any) error {
 		p.amount = ev.Amount
 		p.narration = ev.Narration
 		p.status = StatusInitiated
+		p.version++
+		return nil
+	case PaymentAuthorized:
+		p.status = StatusAuthorized
+		p.version++
+		return nil
+	case PaymentSettled:
+		p.status = StatusSettled
+		p.version++
+		return nil
+	case PaymentFailed:
+		p.status = StatusFailed
 		p.version++
 		return nil
 	default:

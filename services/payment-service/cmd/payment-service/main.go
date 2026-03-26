@@ -94,6 +94,9 @@ func main() {
 
 	uow := paymentpg.NewUnitOfWork(pool)
 	initiate := commands.NewInitiatePaymentHandler(uow)
+	authorize := commands.NewAuthorizePaymentHandler(uow)
+	settle := commands.NewSettlePaymentHandler(uow)
+	fail := commands.NewFailPaymentHandler(uow)
 	q := paymentpg.NewPaymentQuery(pool)
 
 	lis, err := net.Listen("tcp", grpcAddr)
@@ -102,8 +105,11 @@ func main() {
 	}
 
 	authInterceptor := middleware.UnaryAuthzInterceptor(tokens, map[string]string{
-		"/InitiatePayment": "payment:write",
-		"/GetPayment":      "payment:read",
+		"/InitiatePayment":  "payment:write",
+		"/AuthorizePayment": "payment:write",
+		"/SettlePayment":    "payment:write",
+		"/FailPayment":      "payment:write",
+		"/GetPayment":       "payment:read",
 	})
 	serverOpts := []grpc.ServerOption{grpc.UnaryInterceptor(authInterceptor)}
 	if creds, closeSrc, err := security.NewSpiffeMTLSServerCredentials(ctx); err == nil {
@@ -113,7 +119,7 @@ func main() {
 	}
 
 	gs := grpc.NewServer(serverOpts...)
-	paymentv1.RegisterPaymentServiceServer(gs, paymentgrpc.NewServer(initiate, q))
+	paymentv1.RegisterPaymentServiceServer(gs, paymentgrpc.NewServer(initiate, authorize, settle, fail, q))
 
 	go func() {
 		log.Printf("Starting gRPC server on %s", grpcAddr)

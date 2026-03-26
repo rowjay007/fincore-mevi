@@ -41,3 +41,37 @@ func TestNewPayment_RejectsSameAccount(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 }
+
+func TestPaymentLifecycle_AuthorizeSettle(t *testing.T) {
+	amt, _ := money.New(100, money.NGN)
+	p, err := NewPayment(ids.New(), ids.New(), amt, "")
+	if err != nil {
+		t.Fatalf("new payment: %v", err)
+	}
+	if err := p.Authorize(); err != nil {
+		t.Fatalf("authorize: %v", err)
+	}
+	if p.Status() != StatusAuthorized {
+		t.Fatalf("expected authorized")
+	}
+	if err := p.Settle(); err != nil {
+		t.Fatalf("settle: %v", err)
+	}
+	if p.Status() != StatusSettled {
+		t.Fatalf("expected settled")
+	}
+}
+
+func TestPaymentLifecycle_Fail(t *testing.T) {
+	amt, _ := money.New(100, money.NGN)
+	p, err := NewPayment(ids.New(), ids.New(), amt, "")
+	if err != nil {
+		t.Fatalf("new payment: %v", err)
+	}
+	if err := p.Fail("declined"); err != nil {
+		t.Fatalf("fail: %v", err)
+	}
+	if p.Status() != StatusFailed {
+		t.Fatalf("expected failed")
+	}
+}
