@@ -22,6 +22,10 @@ func (m *mockUoW) WithTx(ctx context.Context, fn func(context.Context, ports.Pay
 	return fn(ctx, m.es, m.ob, m.proj)
 }
 
+func (m *mockUoW) Outbox() ports.OutboxStore {
+	return m.ob
+}
+
 func TestPaymentLifecycle(t *testing.T) {
 	// Simple in-memory mocks for testing the handlers' orchestration
 	es := &mockEventStore{events: make(map[string][]eventstore.Event)}

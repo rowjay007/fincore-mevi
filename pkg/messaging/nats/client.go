@@ -35,6 +35,10 @@ func (c *Client) Subscribe(subject string, queue string, handler func(msg *nats.
 	return nil
 }
 
+func (c *Client) Conn() *nats.Conn {
+	return c.nc
+}
+
 func (c *Client) Close() {
 	if c.nc != nil {
 		c.nc.Close()

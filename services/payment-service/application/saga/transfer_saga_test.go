@@ -25,6 +25,10 @@ func (m *mockUoW) WithTx(ctx context.Context, fn func(context.Context, ports.Pay
 	return fn(ctx, m.es, m.ob, m.proj)
 }
 
+func (m *mockUoW) Outbox() ports.OutboxStore {
+	return m.ob
+}
+
 type mockLedgerClient struct {
 	PostEntryFunc func(ctx context.Context, accountID string, amount money.Money, entryType string, idempotencyKey string, narration string) (string, error)
 }

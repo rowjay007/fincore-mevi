@@ -6,14 +6,23 @@ import (
 	"fincore/pkg/outbox"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Store struct {
-	q pgx.Tx
+	q interface {
+		Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+		Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	}
 }
 
 func New(tx pgx.Tx) *Store {
 	return &Store{q: tx}
+}
+
+func NewPool(pool *pgxpool.Pool) *Store {
+	return &Store{q: pool}
 }
 
 func (s *Store) Enqueue(ctx context.Context, msg outbox.Message) error {

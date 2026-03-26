@@ -17,6 +17,7 @@ import (
 	"fincore/pkg/security/middleware"
 	"fincore/services/payment-service/application/commands"
 	"fincore/services/payment-service/application/saga"
+	"fincore/services/payment-service/application/workers"
 	paymentgrpc "fincore/services/payment-service/infrastructure/grpc"
 	paymentmsg "fincore/services/payment-service/infrastructure/messaging"
 	paymentpg "fincore/services/payment-service/infrastructure/postgres"
@@ -124,6 +125,10 @@ func main() {
 		if err := consumer.Start(ctx); err != nil {
 			log.Printf("Error starting event consumer: %v", err)
 		}
+
+		// Outbox Worker
+		outboxWorker := workers.NewOutboxWorker(uow.Outbox(), natsClient.Conn())
+		go outboxWorker.Start(ctx)
 	}
 
 	lis, err := net.Listen("tcp", grpcAddr)

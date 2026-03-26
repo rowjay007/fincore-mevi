@@ -36,4 +36,5 @@ type PaymentProjectionRepository interface {
 
 type UnitOfWork interface {
 	WithTx(ctx context.Context, fn func(ctx context.Context, es PaymentEventStore, ob OutboxStore, proj PaymentProjectionRepository) error) error
+	Outbox() OutboxStore
 }
