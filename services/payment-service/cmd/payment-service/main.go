@@ -101,7 +101,12 @@ func main() {
 	q := paymentpg.NewPaymentQuery(pool)
 
 	// Saga instantiation - will be wired to event consumer in next milestone
-	_ = saga.NewTransferSaga(uow, authorize, settle, fail)
+	ledgerConn, _ := grpc.NewClient("ledger-service:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	accountConn, _ := grpc.NewClient("account-service:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	lc := paymentgrpc.NewLedgerClient(ledgerConn)
+	ac := paymentgrpc.NewAccountClient(accountConn)
+
+	_ = saga.NewTransferSaga(uow, authorize, settle, fail, lc, ac)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
