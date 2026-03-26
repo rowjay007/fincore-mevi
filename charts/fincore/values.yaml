@@ -1,0 +1,32 @@
+image:
+  registry: ghcr.io
+  repository: rowjay007/fincore-mevi
+  tag: latest
+  pullPolicy: IfNotPresent
+
+services:
+  api-gateway:
+    enabled: true
+    port: 8080
+    env: {}
+  identity-service:
+    enabled: true
+    port: 8084
+    env: {}
+  auth-service:
+    enabled: true
+    port: 8082
+    env: {}
+  account-service:
+    enabled: true
+    port: 8080
+    env: {}
+  ledger-service:
+    enabled: true
+    port: 8083
+    env: {}
+
+replicaCount: 1
+
+resources: {}
+

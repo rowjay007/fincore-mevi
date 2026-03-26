@@ -1,0 +1,82 @@
+name: images
+
+on:
+  push:
+    branches: ["main"]
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: account-service
+            pkg: ./services/account-service/cmd/account-service
+            bin: account-service
+            port: 8080
+          - name: api-gateway
+            pkg: ./services/api-gateway/cmd/api-gateway
+            bin: api-gateway
+            port: 8080
+          - name: auth-service
+            pkg: ./services/auth-service/cmd/auth-service
+            bin: auth-service
+            port: 8082
+          - name: identity-service
+            pkg: ./services/identity-service/cmd/identity-service
+            bin: identity-service
+            port: 8084
+          - name: ledger-service
+            pkg: ./services/ledger-service/cmd/ledger-service
+            bin: ledger-service
+            port: 8083
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: set up docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: login to ghcr
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service.name }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: build (and push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            SERVICE_PKG=${{ matrix.service.pkg }}
+            BIN_NAME=${{ matrix.service.bin }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
