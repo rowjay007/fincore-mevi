@@ -14,6 +14,8 @@ type PaymentEventStore interface {
 
 type OutboxStore interface {
 	outbox.Store
+	GetPending(ctx context.Context, limit int) ([]outbox.Message, error)
+	MarkProcessed(ctx context.Context, ids []string) error
 }
 
 type PaymentProjection struct {

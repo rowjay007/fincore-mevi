@@ -88,9 +88,22 @@ func (m *mockEventStore) SaveSnapshot(ctx context.Context, snap eventstore.Snaps
 	return nil
 }
 
-type mockOutboxStore struct{}
+type mockOutboxStore struct {
+	messages []outbox.Message
+}
 
-func (m *mockOutboxStore) Enqueue(ctx context.Context, msg outbox.Message) error { return nil }
+func (m *mockOutboxStore) Enqueue(ctx context.Context, msg outbox.Message) error {
+	m.messages = append(m.messages, msg)
+	return nil
+}
+
+func (m *mockOutboxStore) GetPending(ctx context.Context, limit int) ([]outbox.Message, error) {
+	return nil, nil
+}
+
+func (m *mockOutboxStore) MarkProcessed(ctx context.Context, ids []string) error {
+	return nil
+}
 
 type mockProjRepo struct {
 	data map[string]ports.PaymentProjection
