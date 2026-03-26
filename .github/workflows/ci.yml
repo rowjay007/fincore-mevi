@@ -31,11 +31,11 @@ jobs:
         with:
           path: |
             ~/go/bin/staticcheck
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-staticcheck-0.5.1
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-staticcheck-latest
 
       - name: staticcheck
         run: |
-          test -x "$(go env GOPATH)/bin/staticcheck" || go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
+          test -x "$(go env GOPATH)/bin/staticcheck" || go install honnef.co/go/tools/cmd/staticcheck@latest
           staticcheck ./...
 
   unit:

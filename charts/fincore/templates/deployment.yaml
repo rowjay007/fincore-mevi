@@ -44,11 +44,24 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
+          {{- if or $svc.config.enabled $svc.envFrom.configMapName $svc.envFrom.secretName }}
+          envFrom:
+            {{- if or $svc.config.enabled $svc.envFrom.configMapName }}
+            - configMapRef:
+                name: {{ default (include "fincore.configMapName" (dict "root" $root "svcName" $svcName)) $svc.envFrom.configMapName | quote }}
+            {{- end }}
+            {{- if $svc.envFrom.secretName }}
+            - secretRef:
+                name: {{ $svc.envFrom.secretName | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if $svc.env }}
           env:
             {{- range $k, $v := $svc.env }}
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
+          {{- end }}
           resources:
             {{- toYaml $root.Values.resources | nindent 12 }}
 {{- end }}

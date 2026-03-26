@@ -1,0 +1,17 @@
+{{- $root := . -}}
+{{- range $svcName, $svc := .Values.services }}
+{{- if and $svc.enabled $svc.config.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fincore.configMapName" (dict "root" $root "svcName" $svcName) }}
+  labels:
+    app.kubernetes.io/name: {{ include "fincore.name" $root }}
+    app.kubernetes.io/component: {{ $svcName }}
+data:
+  {{- range $k, $v := $svc.config.data }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

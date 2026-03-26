@@ -9,24 +9,65 @@ services:
     enabled: true
     port: 8080
     env: {}
+    envFrom:
+      configMapName: ""
+      secretName: ""
+    config:
+      enabled: false
+      data: {}
   identity-service:
     enabled: true
     port: 8084
     env: {}
+    envFrom:
+      configMapName: ""
+      secretName: ""
+    config:
+      enabled: false
+      data: {}
   auth-service:
     enabled: true
     port: 8082
     env: {}
+    envFrom:
+      configMapName: ""
+      secretName: ""
+    config:
+      enabled: false
+      data: {}
   account-service:
     enabled: true
     port: 8080
     env: {}
+    envFrom:
+      configMapName: ""
+      secretName: ""
+    config:
+      enabled: false
+      data: {}
   ledger-service:
     enabled: true
     port: 8083
     env: {}
+    envFrom:
+      configMapName: ""
+      secretName: ""
+    config:
+      enabled: false
+      data: {}
 
 replicaCount: 1
 
 resources: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: fincore.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
 
