@@ -247,6 +247,10 @@ func oauth2ErrorFromGRPC(err error) (code string, desc string) {
 
 func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string, pool *pgxpool.Pool) *http.ServeMux {
 	h := http.NewServeMux()
+	h.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 	store := newBrowserSessionStore(pool, 30*time.Minute)
 	const sessionCookieName = "fincore_authorize_session"
 	const csrfCookieName = "fincore_authorize_csrf"

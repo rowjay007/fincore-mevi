@@ -28,6 +28,22 @@ spec:
           ports:
             - name: http
               containerPort: {{ $svc.port }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           env:
             {{- range $k, $v := $svc.env }}
             - name: {{ $k }}

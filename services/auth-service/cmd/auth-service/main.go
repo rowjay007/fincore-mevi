@@ -148,6 +148,10 @@ func main() {
 	}
 
 	h := http.NewServeMux()
+	h.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 	h.Handle("/", mux)
 	h.HandleFunc("/jwks.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

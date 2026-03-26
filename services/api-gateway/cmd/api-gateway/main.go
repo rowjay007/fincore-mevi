@@ -296,8 +296,15 @@ func main() {
 	h = withJWTAuth(verifier, publicPrefixes, h)
 	h = withRateLimitByPath(lim, strict, strictPrefixes, h)
 
+	root := http.NewServeMux()
+	root.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	root.Handle("/", h)
+
 	log.Printf("Starting api-gateway on %s", httpAddr)
-	if err := http.ListenAndServe(httpAddr, h); err != nil {
+	if err := http.ListenAndServe(httpAddr, root); err != nil {
 		log.Fatalf("failed to serve http: %v", err)
 	}
 }

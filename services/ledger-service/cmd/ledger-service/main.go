@@ -130,8 +130,15 @@ func main() {
 		log.Fatalf("failed to register gateway: %v", err)
 	}
 
+	h := http.NewServeMux()
+	h.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	h.Handle("/", mux)
+
 	log.Printf("Starting HTTP gateway on %s", httpAddr)
-	if err := http.ListenAndServe(httpAddr, mux); err != nil {
+	if err := http.ListenAndServe(httpAddr, h); err != nil {
 		log.Fatalf("failed to serve HTTP: %v", err)
 	}
 }
