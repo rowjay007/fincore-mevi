@@ -10,6 +10,7 @@ import (
 	"time"
 
 	paymentv1 "fincore/gen/go/payment/v1"
+	messaging "fincore/pkg/messaging/nats"
 	"fincore/pkg/postgres"
 	"fincore/pkg/secrets"
 	"fincore/pkg/security"
@@ -17,6 +18,7 @@ import (
 	"fincore/services/payment-service/application/commands"
 	"fincore/services/payment-service/application/saga"
 	paymentgrpc "fincore/services/payment-service/infrastructure/grpc"
+	paymentmsg "fincore/services/payment-service/infrastructure/messaging"
 	paymentpg "fincore/services/payment-service/infrastructure/postgres"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -100,13 +102,29 @@ func main() {
 	fail := commands.NewFailPaymentHandler(uow)
 	q := paymentpg.NewPaymentQuery(pool)
 
-	// Saga instantiation - will be wired to event consumer in next milestone
+	// Saga instantiation
 	ledgerConn, _ := grpc.NewClient("ledger-service:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	accountConn, _ := grpc.NewClient("account-service:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	lc := paymentgrpc.NewLedgerClient(ledgerConn)
 	ac := paymentgrpc.NewAccountClient(accountConn)
 
-	_ = saga.NewTransferSaga(uow, authorize, settle, fail, lc, ac)
+	transferSaga := saga.NewTransferSaga(uow, authorize, settle, fail, lc, ac)
+
+	// Event Consumer
+	natsUrl := os.Getenv("NATS_URL")
+	if natsUrl == "" {
+		natsUrl = "nats://nats:4222"
+	}
+	natsClient, err := messaging.NewClient(natsUrl)
+	if err != nil {
+		log.Printf("Warning: could not connect to NATS: %v", err)
+	} else {
+		defer natsClient.Close()
+		consumer := paymentmsg.NewEventConsumer(natsClient, transferSaga)
+		if err := consumer.Start(ctx); err != nil {
+			log.Printf("Error starting event consumer: %v", err)
+		}
+	}
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
