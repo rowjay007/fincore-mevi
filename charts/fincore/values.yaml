@@ -49,6 +49,17 @@ services:
     config:
       enabled: false
       data: {}
+  payment-service:
+    enabled: true
+    port: 8085
+    env: {}
+    readinessPath: /readyz
+    envFrom:
+      configMapName: ""
+      secretName: ""
+    config:
+      enabled: false
+      data: {}
   ledger-service:
     enabled: true
     port: 8083

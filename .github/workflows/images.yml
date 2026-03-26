@@ -7,6 +7,9 @@ on:
       - "v*"
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
   packages: write
@@ -26,6 +29,10 @@ jobs:
             pkg: ./services/account-service/cmd/account-service
             bin: account-service
             port: 8080
+          - name: payment-service
+            pkg: ./services/payment-service/cmd/payment-service
+            bin: payment-service
+            port: 8085
           - name: api-gateway
             pkg: ./services/api-gateway/cmd/api-gateway
             bin: api-gateway

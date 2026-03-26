@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package fincore.payment.v1;
+
+import "common/v1/money.proto";
+import "google/api/annotations.proto";
+
+option go_package = "fincore/gen/go/payment/v1;paymentv1";
+
+service PaymentService {
+  rpc InitiatePayment(InitiatePaymentRequest) returns (InitiatePaymentResponse) {
+    option (google.api.http) = {
+      post: "/v1/payments"
+      body: "*"
+    };
+  }
+
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {
+    option (google.api.http) = {
+      get: "/v1/payments/{payment_id}"
+    };
+  }
+}
+
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_STATUS_INITIATED = 1;
+  PAYMENT_STATUS_AUTHORIZED = 2;
+  PAYMENT_STATUS_SETTLED = 3;
+  PAYMENT_STATUS_FAILED = 4;
+}
+
+message InitiatePaymentRequest {
+  string idempotency_key = 1;
+  string from_account_id = 2;
+  string to_account_id = 3;
+  fincore.common.v1.Money amount = 4;
+  string narration = 5;
+}
+
+message InitiatePaymentResponse {
+  string payment_id = 1;
+  PaymentStatus status = 2;
+}
+
+message GetPaymentRequest {
+  string payment_id = 1;
+}
+
+message Payment {
+  string payment_id = 1;
+  string from_account_id = 2;
+  string to_account_id = 3;
+  fincore.common.v1.Money amount = 4;
+  string narration = 5;
+  PaymentStatus status = 6;
+  int64 version = 7;
+}
+
+message GetPaymentResponse {
+  Payment payment = 1;
+}
