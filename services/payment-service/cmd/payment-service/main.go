@@ -15,6 +15,7 @@ import (
 	"fincore/pkg/security"
 	"fincore/pkg/security/middleware"
 	"fincore/services/payment-service/application/commands"
+	"fincore/services/payment-service/application/saga"
 	paymentgrpc "fincore/services/payment-service/infrastructure/grpc"
 	paymentpg "fincore/services/payment-service/infrastructure/postgres"
 
@@ -98,6 +99,9 @@ func main() {
 	settle := commands.NewSettlePaymentHandler(uow)
 	fail := commands.NewFailPaymentHandler(uow)
 	q := paymentpg.NewPaymentQuery(pool)
+
+	// Saga instantiation - will be wired to event consumer in next milestone
+	_ = saga.NewTransferSaga(uow, authorize, settle, fail)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {

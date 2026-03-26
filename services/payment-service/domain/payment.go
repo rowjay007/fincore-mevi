@@ -16,6 +16,11 @@ const (
 	StatusAuthorized Status = "authorized"
 	StatusSettled    Status = "settled"
 	StatusFailed     Status = "failed"
+
+	EventPaymentInitiated  = "payment.initiated.v1"
+	EventPaymentAuthorized = "payment.authorized.v1"
+	EventPaymentSettled    = "payment.settled.v1"
+	EventPaymentFailed     = "payment.failed.v1"
 )
 
 type PaymentInitiated struct {
@@ -27,7 +32,7 @@ type PaymentInitiated struct {
 	OccurredAt    time.Time   `json:"occurred_at"`
 }
 
-func (e PaymentInitiated) EventType() string        { return "payment.initiated.v1" }
+func (e PaymentInitiated) EventType() string        { return EventPaymentInitiated }
 func (e PaymentInitiated) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
 
 type PaymentAuthorized struct {
@@ -35,7 +40,7 @@ type PaymentAuthorized struct {
 	OccurredAt time.Time `json:"occurred_at"`
 }
 
-func (e PaymentAuthorized) EventType() string        { return "payment.authorized.v1" }
+func (e PaymentAuthorized) EventType() string        { return EventPaymentAuthorized }
 func (e PaymentAuthorized) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
 
 type PaymentSettled struct {
@@ -43,7 +48,7 @@ type PaymentSettled struct {
 	OccurredAt time.Time `json:"occurred_at"`
 }
 
-func (e PaymentSettled) EventType() string        { return "payment.settled.v1" }
+func (e PaymentSettled) EventType() string        { return EventPaymentSettled }
 func (e PaymentSettled) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
 
 type PaymentFailed struct {
@@ -52,7 +57,7 @@ type PaymentFailed struct {
 	OccurredAt time.Time `json:"occurred_at"`
 }
 
-func (e PaymentFailed) EventType() string        { return "payment.failed.v1" }
+func (e PaymentFailed) EventType() string        { return EventPaymentFailed }
 func (e PaymentFailed) OccurredAtUTC() time.Time { return e.OccurredAt.UTC() }
 
 type Payment struct {
