@@ -57,7 +57,7 @@ jobs:
           dist/${{ matrix.service.bin }} --help >/dev/null 2>&1 || true
 
       - name: upload artifact (${{ matrix.service.name }})
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.service.bin }}-${{ github.sha }}
           path: dist/${{ matrix.service.bin }}
@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist
 
