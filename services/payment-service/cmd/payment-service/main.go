@@ -16,6 +16,7 @@ import (
 	"fincore/pkg/security"
 	"fincore/pkg/security/middleware"
 	"fincore/services/payment-service/application/commands"
+	"fincore/services/payment-service/application/ports"
 	"fincore/services/payment-service/application/saga"
 	"fincore/services/payment-service/application/workers"
 	paymentgrpc "fincore/services/payment-service/infrastructure/grpc"
@@ -104,10 +105,38 @@ func main() {
 	q := paymentpg.NewPaymentQuery(pool)
 
 	// Saga instantiation
-	ledgerConn, _ := grpc.NewClient("ledger-service:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	accountConn, _ := grpc.NewClient("account-service:8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	lc := paymentgrpc.NewLedgerClient(ledgerConn)
-	ac := paymentgrpc.NewAccountClient(accountConn)
+	ledgerAddr := strings.TrimSpace(os.Getenv("LEDGER_GRPC_ADDR"))
+	if ledgerAddr == "" {
+		ledgerAddr = "ledger-service:8080"
+	}
+	accountAddr := strings.TrimSpace(os.Getenv("ACCOUNT_GRPC_ADDR"))
+	if accountAddr == "" {
+		accountAddr = "account-service:8080"
+	}
+
+	ledgerConn, err := grpc.NewClient(ledgerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Printf("Warning: could not create ledger client (%s): %v", ledgerAddr, err)
+		ledgerConn = nil
+	} else {
+		defer ledgerConn.Close()
+	}
+	accountConn, err := grpc.NewClient(accountAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Printf("Warning: could not create account client (%s): %v", accountAddr, err)
+		accountConn = nil
+	} else {
+		defer accountConn.Close()
+	}
+
+	var lc ports.LedgerClient
+	if ledgerConn != nil {
+		lc = paymentgrpc.NewLedgerClient(ledgerConn)
+	}
+	var ac ports.AccountClient
+	if accountConn != nil {
+		ac = paymentgrpc.NewAccountClient(accountConn)
+	}
 
 	transferSaga := saga.NewTransferSaga(uow, authorize, settle, fail, lc, ac)
 
