@@ -30,7 +30,7 @@ spec:
               containerPort: {{ $svc.port }}
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: {{ default "/healthz" $svc.readinessPath }}
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5

@@ -9,6 +9,7 @@ services:
     enabled: true
     port: 8080
     env: {}
+    readinessPath: /healthz
     envFrom:
       configMapName: ""
       secretName: ""
@@ -19,6 +20,7 @@ services:
     enabled: true
     port: 8084
     env: {}
+    readinessPath: /readyz
     envFrom:
       configMapName: ""
       secretName: ""
@@ -29,6 +31,7 @@ services:
     enabled: true
     port: 8082
     env: {}
+    readinessPath: /readyz
     envFrom:
       configMapName: ""
       secretName: ""
@@ -39,6 +42,7 @@ services:
     enabled: true
     port: 8080
     env: {}
+    readinessPath: /readyz
     envFrom:
       configMapName: ""
       secretName: ""
@@ -49,6 +53,7 @@ services:
     enabled: true
     port: 8083
     env: {}
+    readinessPath: /readyz
     envFrom:
       configMapName: ""
       secretName: ""
