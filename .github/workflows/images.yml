@@ -5,7 +5,25 @@ on:
     branches: ["main"]
     tags:
       - "v*"
+    paths:
+      - "Dockerfile"
+      - "go.mod"
+      - "go.sum"
+      - "proto/**"
+      - "pkg/**"
+      - "services/**"
+      - "helm/**"
+      - ".github/workflows/images.yml"
   pull_request:
+    paths:
+      - "Dockerfile"
+      - "go.mod"
+      - "go.sum"
+      - "proto/**"
+      - "pkg/**"
+      - "services/**"
+      - "helm/**"
+      - ".github/workflows/images.yml"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
