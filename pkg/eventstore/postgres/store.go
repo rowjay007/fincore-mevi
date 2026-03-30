@@ -7,14 +7,25 @@ import (
 	"fincore/pkg/eventstore"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Store struct {
-	q pgx.Tx
+type Queryer interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func New(tx pgx.Tx) *Store {
-	return &Store{q: tx}
+type Store struct {
+	q Queryer
+}
+
+func New(q Queryer) *Store {
+	return &Store{q: q}
+}
+
+func NewPool(pool Queryer) *Store {
+	return &Store{q: pool}
 }
 
 func (s *Store) Append(ctx context.Context, events []eventstore.Event) error {
@@ -58,6 +69,38 @@ func (s *Store) Read(ctx context.Context, aggregateID string, fromVersionExclusi
 		return nil, err
 	}
 	return out, nil
+}
+
+func (s *Store) ReadAll(ctx context.Context, fromSequenceExclusive int64, limit int) ([]eventstore.Event, int64, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	rows, err := s.q.Query(ctx, `select sequence, id, aggregate_id, aggregate_type, version, type, occurred_at, data, metadata
+		from event_store_events
+		where sequence > $1
+		order by sequence asc
+		limit $2`, fromSequenceExclusive, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var out []eventstore.Event
+	lastSeq := fromSequenceExclusive
+	for rows.Next() {
+		var e eventstore.Event
+		var seq int64
+		err := rows.Scan(&seq, &e.ID, &e.AggregateID, &e.AggregateType, &e.Version, &e.Type, &e.OccurredAt, &e.Data, &e.Metadata)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, e)
+		lastSeq = seq
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return out, lastSeq, nil
 }
 
 func (s *Store) SaveSnapshot(ctx context.Context, snap eventstore.Snapshot) error {

@@ -6,6 +6,7 @@ import (
 	espg "fincore/pkg/eventstore/postgres"
 	obpg "fincore/pkg/outbox/postgres"
 	"fincore/services/ledger-service/application/ports"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,6 +36,14 @@ func (u *UnitOfWork) WithTx(ctx context.Context, fn func(ctx context.Context, es
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+func (u *UnitOfWork) LedgerStore() ports.LedgerEventStore {
+	return espg.NewPool(u.pool)
+}
+
+func (u *UnitOfWork) Balance() ports.BalanceRepository {
+	return NewBalanceRepo(u.pool)
 }
 
 var _ ports.UnitOfWork = (*UnitOfWork)(nil)

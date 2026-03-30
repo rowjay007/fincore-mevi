@@ -15,6 +15,7 @@ import (
 	"fincore/pkg/security"
 	"fincore/pkg/security/middleware"
 	"fincore/services/ledger-service/application/commands"
+	"fincore/services/ledger-service/application/workers"
 	ledgergrpc "fincore/services/ledger-service/infrastructure/grpc"
 	ledgerpg "fincore/services/ledger-service/infrastructure/postgres"
 
@@ -96,6 +97,10 @@ func main() {
 	post := commands.NewPostEntryHandler(uow)
 
 	balQuery := ledgerpg.NewBalanceQuery(pool)
+
+	// 3b. Projection Worker
+	projectionWorker := workers.NewLedgerProjectionWorker(uow.LedgerStore(), uow.Balance())
+	go projectionWorker.Start(ctx)
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {

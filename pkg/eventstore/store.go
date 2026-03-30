@@ -8,6 +8,7 @@ type Appender interface {
 
 type Reader interface {
 	Read(ctx context.Context, aggregateID string, fromVersionExclusive int64, limit int) ([]Event, error)
+	ReadAll(ctx context.Context, fromSequenceExclusive int64, limit int) ([]Event, int64, error)
 }
 
 type Store interface {

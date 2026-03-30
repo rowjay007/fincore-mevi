@@ -6,14 +6,21 @@ import (
 	"fincore/services/account-service/application/ports"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type AccountProjectionRepo struct {
-	q pgx.Tx
+type Queryer interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func NewAccountProjectionRepo(tx pgx.Tx) *AccountProjectionRepo {
-	return &AccountProjectionRepo{q: tx}
+type AccountProjectionRepo struct {
+	q Queryer
+}
+
+func NewAccountProjectionRepo(q Queryer) *AccountProjectionRepo {
+	return &AccountProjectionRepo{q: q}
 }
 
 func (r *AccountProjectionRepo) Upsert(ctx context.Context, p ports.AccountProjection) error {

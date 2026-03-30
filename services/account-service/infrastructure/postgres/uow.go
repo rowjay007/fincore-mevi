@@ -37,4 +37,12 @@ func (u *UnitOfWork) WithTx(ctx context.Context, fn func(ctx context.Context, es
 	return tx.Commit(ctx)
 }
 
+func (u *UnitOfWork) AccountStore() ports.AccountEventStore {
+	return espg.NewPool(u.pool)
+}
+
+func (u *UnitOfWork) Projection() ports.AccountProjectionRepository {
+	return NewAccountProjectionRepo(u.pool)
+}
+
 var _ ports.UnitOfWork = (*UnitOfWork)(nil)

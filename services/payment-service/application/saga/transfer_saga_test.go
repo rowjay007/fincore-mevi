@@ -3,6 +3,8 @@ package saga
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,6 +84,14 @@ func (m *mockEventStore) Read(ctx context.Context, aggregateID string, fromVersi
 		}
 	}
 	return res, nil
+}
+
+func (m *mockEventStore) ReadAll(ctx context.Context, fromSequence int64, limit int) ([]eventstore.Event, int64, error) {
+	var all []eventstore.Event
+	for _, evs := range m.events {
+		all = append(all, evs...)
+	}
+	return all, fromSequence, nil
 }
 
 func (m *mockEventStore) LoadLatestSnapshot(ctx context.Context, aggregateID string) (*eventstore.Snapshot, error) {
@@ -178,5 +188,199 @@ func TestTransferSaga_handlePaymentInitiated(t *testing.T) {
 	}
 	if p.Status != string(domain.StatusSettled) {
 		t.Errorf("expected status settled, got %s", p.Status)
+	}
+}
+
+func TestTransferSaga_handlePaymentInitiated_withdrawFails_marksPaymentFailed(t *testing.T) {
+	es := &mockEventStore{events: make(map[string][]eventstore.Event)}
+	ob := &mockOutboxStore{}
+	proj := &mockProjRepo{data: make(map[string]ports.PaymentProjection)}
+	uow := &mockUoW{es: es, ob: ob, proj: proj}
+
+	authH := commands.NewAuthorizePaymentHandler(uow)
+	settleH := commands.NewSettlePaymentHandler(uow)
+	failH := commands.NewFailPaymentHandler(uow)
+	lc := &mockLedgerClient{}
+
+	withdrawErr := errors.New("withdraw failed")
+	withdrawCalls := 0
+	ac := &mockAccountClient{
+		WithdrawFunc: func(ctx context.Context, accountID string, amount money.Money, idempotencyKey string, narration string) (string, error) {
+			withdrawCalls++
+			return "", withdrawErr
+		},
+	}
+
+	s := NewTransferSaga(uow, authH, settleH, failH, lc, ac)
+
+	paymentID := ids.New()
+	fromID := ids.New()
+	toID := ids.New()
+	amt := money.MustNew(100, money.NGN)
+
+	ev := domain.PaymentInitiated{
+		PaymentID:     paymentID,
+		FromAccountID: fromID,
+		ToAccountID:   toID,
+		Amount:        amt,
+		Narration:     "Test Saga",
+		OccurredAt:    time.Now().UTC(),
+	}
+	b, _ := json.Marshal(ev)
+	_ = es.Append(context.Background(), []eventstore.Event{{
+		AggregateID: paymentID.String(),
+		Version:     1,
+		Data:        b,
+		Type:        domain.EventPaymentInitiated,
+	}})
+	_ = proj.Upsert(context.Background(), ports.PaymentProjection{PaymentID: paymentID.String(), Status: string(domain.StatusInitiated), Version: 1})
+
+	payload, _ := json.Marshal(ev)
+	err := s.ProcessEvent(context.Background(), domain.EventPaymentInitiated, payload)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !errors.Is(err, withdrawErr) {
+		t.Fatalf("expected withdraw error, got %v", err)
+	}
+	if withdrawCalls != 1 {
+		t.Fatalf("expected 1 withdraw call, got %d", withdrawCalls)
+	}
+
+	p, ok, _ := proj.GetByID(context.Background(), paymentID.String())
+	if !ok {
+		t.Fatal("projection not found")
+	}
+	if p.Status != string(domain.StatusFailed) {
+		t.Fatalf("expected status failed, got %s", p.Status)
+	}
+}
+
+func TestTransferSaga_handlePaymentInitiated_ledgerWithdrawPostFails_refundsAndMarksFailed(t *testing.T) {
+	es := &mockEventStore{events: make(map[string][]eventstore.Event)}
+	ob := &mockOutboxStore{}
+	proj := &mockProjRepo{data: make(map[string]ports.PaymentProjection)}
+	uow := &mockUoW{es: es, ob: ob, proj: proj}
+
+	authH := commands.NewAuthorizePaymentHandler(uow)
+	settleH := commands.NewSettlePaymentHandler(uow)
+	failH := commands.NewFailPaymentHandler(uow)
+
+	ledgerErr := errors.New("ledger wdr post failed")
+	lc := &mockLedgerClient{PostEntryFunc: func(ctx context.Context, accountID string, amount money.Money, entryType string, idempotencyKey string, narration string) (string, error) {
+		if entryType == "withdrawal" {
+			return "", ledgerErr
+		}
+		return "entry", nil
+	}}
+
+	depositCalls := 0
+	refundCalls := 0
+	ac := &mockAccountClient{
+		WithdrawFunc: func(ctx context.Context, accountID string, amount money.Money, idempotencyKey string, narration string) (string, error) {
+			return "wdr", nil
+		},
+		DepositFunc: func(ctx context.Context, accountID string, amount money.Money, idempotencyKey string, narration string) (string, error) {
+			depositCalls++
+			if strings.HasPrefix(idempotencyKey, "refund-") {
+				refundCalls++
+			}
+			return "dep", nil
+		},
+	}
+
+	s := NewTransferSaga(uow, authH, settleH, failH, lc, ac)
+
+	paymentID := ids.New()
+	fromID := ids.New()
+	toID := ids.New()
+	amt := money.MustNew(100, money.NGN)
+
+	ev := domain.PaymentInitiated{PaymentID: paymentID, FromAccountID: fromID, ToAccountID: toID, Amount: amt, Narration: "Test", OccurredAt: time.Now().UTC()}
+	b, _ := json.Marshal(ev)
+	_ = es.Append(context.Background(), []eventstore.Event{{AggregateID: paymentID.String(), Version: 1, Data: b, Type: domain.EventPaymentInitiated}})
+	_ = proj.Upsert(context.Background(), ports.PaymentProjection{PaymentID: paymentID.String(), Status: string(domain.StatusInitiated), Version: 1})
+
+	payload, _ := json.Marshal(ev)
+	err := s.ProcessEvent(context.Background(), domain.EventPaymentInitiated, payload)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !errors.Is(err, ledgerErr) {
+		t.Fatalf("expected ledger error, got %v", err)
+	}
+	if depositCalls != 1 {
+		t.Fatalf("expected 1 deposit call (refund), got %d", depositCalls)
+	}
+	if refundCalls != 1 {
+		t.Fatalf("expected 1 refund call, got %d", refundCalls)
+	}
+
+	p, ok, _ := proj.GetByID(context.Background(), paymentID.String())
+	if !ok {
+		t.Fatal("projection not found")
+	}
+	if p.Status != string(domain.StatusFailed) {
+		t.Fatalf("expected status failed, got %s", p.Status)
+	}
+}
+
+func TestTransferSaga_handlePaymentInitiated_depositToDestinationFails_refundsAndMarksFailed(t *testing.T) {
+	es := &mockEventStore{events: make(map[string][]eventstore.Event)}
+	ob := &mockOutboxStore{}
+	proj := &mockProjRepo{data: make(map[string]ports.PaymentProjection)}
+	uow := &mockUoW{es: es, ob: ob, proj: proj}
+
+	authH := commands.NewAuthorizePaymentHandler(uow)
+	settleH := commands.NewSettlePaymentHandler(uow)
+	failH := commands.NewFailPaymentHandler(uow)
+	lc := &mockLedgerClient{}
+
+	paymentID := ids.New()
+	fromID := ids.New()
+	toID := ids.New()
+	depErr := errors.New("dest deposit failed")
+	refundCalls := 0
+	ac := &mockAccountClient{
+		WithdrawFunc: func(ctx context.Context, accountID string, amount money.Money, idempotencyKey string, narration string) (string, error) {
+			return "wdr", nil
+		},
+		DepositFunc: func(ctx context.Context, accountID string, amount money.Money, idempotencyKey string, narration string) (string, error) {
+			if accountID == toID.String() {
+				return "", depErr
+			}
+			if strings.HasPrefix(idempotencyKey, "refund-") {
+				refundCalls++
+			}
+			return "dep", nil
+		},
+	}
+
+	s := NewTransferSaga(uow, authH, settleH, failH, lc, ac)
+	amt := money.MustNew(100, money.NGN)
+
+	ev := domain.PaymentInitiated{PaymentID: paymentID, FromAccountID: fromID, ToAccountID: toID, Amount: amt, Narration: "Test", OccurredAt: time.Now().UTC()}
+	b, _ := json.Marshal(ev)
+	_ = es.Append(context.Background(), []eventstore.Event{{AggregateID: paymentID.String(), Version: 1, Data: b, Type: domain.EventPaymentInitiated}})
+	_ = proj.Upsert(context.Background(), ports.PaymentProjection{PaymentID: paymentID.String(), Status: string(domain.StatusInitiated), Version: 1})
+
+	payload, _ := json.Marshal(ev)
+	err := s.ProcessEvent(context.Background(), domain.EventPaymentInitiated, payload)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !errors.Is(err, depErr) {
+		t.Fatalf("expected deposit error, got %v", err)
+	}
+	if refundCalls != 1 {
+		t.Fatalf("expected 1 refund call, got %d", refundCalls)
+	}
+
+	p, ok, _ := proj.GetByID(context.Background(), paymentID.String())
+	if !ok {
+		t.Fatal("projection not found")
+	}
+	if p.Status != string(domain.StatusFailed) {
+		t.Fatalf("expected status failed, got %s", p.Status)
 	}
 }

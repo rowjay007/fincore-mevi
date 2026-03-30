@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"fincore/pkg/ids"
+	"fincore/pkg/money"
 	"fincore/services/payment-service/application/commands"
 	"fincore/services/payment-service/application/ports"
 	"fincore/services/payment-service/domain"
@@ -68,11 +70,7 @@ func (s *TransferSaga) handlePaymentInitiated(ctx context.Context, payload []byt
 	_, err := s.account.Withdraw(ctx, ev.FromAccountID.String(), ev.Amount, fmt.Sprintf("wdr-%s", ev.PaymentID), ev.Narration)
 	if err != nil {
 		log.Printf("[Saga] Withdrawal failed for payment %s: %v", ev.PaymentID, err)
-		_, err := s.fail.Handle(ctx, commands.FailPayment{
-			PaymentID:      ev.PaymentID,
-			IdempotencyKey: fmt.Sprintf("fail-wdr-%s", ev.PaymentID),
-			Reason:         fmt.Sprintf("withdrawal failed: %v", err),
-		})
+		s.bestEffortFailPayment(ctx, ev.PaymentID, fmt.Sprintf("fail-wdr-%s", ev.PaymentID), fmt.Sprintf("withdrawal failed: %v", err))
 		return err
 	}
 
@@ -80,14 +78,17 @@ func (s *TransferSaga) handlePaymentInitiated(ctx context.Context, payload []byt
 	_, err = s.ledger.PostEntry(ctx, ev.FromAccountID.String(), ev.Amount, "withdrawal", fmt.Sprintf("ldg-wdr-%s", ev.PaymentID), ev.Narration)
 	if err != nil {
 		log.Printf("[Saga] Ledger withdrawal entry failed for payment %s: %v", ev.PaymentID, err)
-		// In a real system, we'd need compensating actions here (Refund withdrawal)
+		s.bestEffortRefund(ctx, ev.FromAccountID.String(), ev.Amount, fmt.Sprintf("refund-ledger-wdr-%s", ev.PaymentID), ev.Narration)
+		s.bestEffortFailPayment(ctx, ev.PaymentID, fmt.Sprintf("fail-ledger-wdr-%s", ev.PaymentID), fmt.Sprintf("ledger withdrawal entry failed: %v", err))
+		return err
 	}
 
 	// 3. Deposit to destination account
 	_, err = s.account.Deposit(ctx, ev.ToAccountID.String(), ev.Amount, fmt.Sprintf("dep-%s", ev.PaymentID), ev.Narration)
 	if err != nil {
 		log.Printf("[Saga] Deposit failed for payment %s: %v", ev.PaymentID, err)
-		// Compounding failure - requires manual intervention or sophisticated retry/compensation
+		s.bestEffortRefund(ctx, ev.FromAccountID.String(), ev.Amount, fmt.Sprintf("refund-dep-%s", ev.PaymentID), ev.Narration)
+		s.bestEffortFailPayment(ctx, ev.PaymentID, fmt.Sprintf("fail-dep-%s", ev.PaymentID), fmt.Sprintf("deposit failed: %v", err))
 		return err
 	}
 
@@ -95,6 +96,9 @@ func (s *TransferSaga) handlePaymentInitiated(ctx context.Context, payload []byt
 	_, err = s.ledger.PostEntry(ctx, ev.ToAccountID.String(), ev.Amount, "deposit", fmt.Sprintf("ldg-dep-%s", ev.PaymentID), ev.Narration)
 	if err != nil {
 		log.Printf("[Saga] Ledger deposit entry failed for payment %s: %v", ev.PaymentID, err)
+		s.bestEffortRefund(ctx, ev.FromAccountID.String(), ev.Amount, fmt.Sprintf("refund-ledger-dep-%s", ev.PaymentID), ev.Narration)
+		s.bestEffortFailPayment(ctx, ev.PaymentID, fmt.Sprintf("fail-ledger-dep-%s", ev.PaymentID), fmt.Sprintf("ledger deposit entry failed: %v", err))
+		return err
 	}
 
 	// 5. Authorize and Settle payment
@@ -103,6 +107,8 @@ func (s *TransferSaga) handlePaymentInitiated(ctx context.Context, payload []byt
 		IdempotencyKey: fmt.Sprintf("auth-%s", ev.PaymentID),
 	})
 	if err != nil {
+		s.bestEffortRefund(ctx, ev.FromAccountID.String(), ev.Amount, fmt.Sprintf("refund-auth-%s", ev.PaymentID), ev.Narration)
+		s.bestEffortFailPayment(ctx, ev.PaymentID, fmt.Sprintf("fail-auth-%s", ev.PaymentID), fmt.Sprintf("authorize failed: %v", err))
 		return err
 	}
 
@@ -110,7 +116,33 @@ func (s *TransferSaga) handlePaymentInitiated(ctx context.Context, payload []byt
 		PaymentID:      ev.PaymentID,
 		IdempotencyKey: fmt.Sprintf("settle-%s", ev.PaymentID),
 	})
+	if err != nil {
+		s.bestEffortRefund(ctx, ev.FromAccountID.String(), ev.Amount, fmt.Sprintf("refund-settle-%s", ev.PaymentID), ev.Narration)
+		s.bestEffortFailPayment(ctx, ev.PaymentID, fmt.Sprintf("fail-settle-%s", ev.PaymentID), fmt.Sprintf("settle failed: %v", err))
+		return err
+	}
 	return err
+}
+
+func (s *TransferSaga) bestEffortFailPayment(ctx context.Context, paymentID ids.ID, idempotencyKey string, reason string) {
+	_, err := s.fail.Handle(ctx, commands.FailPayment{
+		PaymentID:      paymentID,
+		IdempotencyKey: idempotencyKey,
+		Reason:         reason,
+	})
+	if err != nil {
+		log.Printf("[Saga] FailPayment handler failed for payment %s: %v", paymentID, err)
+	}
+}
+
+func (s *TransferSaga) bestEffortRefund(ctx context.Context, accountID string, amount money.Money, idempotencyKey string, narration string) {
+	if s.account == nil {
+		return
+	}
+	_, err := s.account.Deposit(ctx, accountID, amount, idempotencyKey, narration)
+	if err != nil {
+		log.Printf("[Saga] Refund deposit failed for account %s: %v", accountID, err)
+	}
 }
 
 func (s *TransferSaga) handleLedgerRecorded(ctx context.Context, payload []byte) error {

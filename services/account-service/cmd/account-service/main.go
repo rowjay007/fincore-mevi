@@ -20,6 +20,7 @@ import (
 	"fincore/pkg/security"
 	"fincore/pkg/security/middleware"
 	"fincore/services/account-service/application/commands"
+	"fincore/services/account-service/application/workers"
 	accountgrpc "fincore/services/account-service/infrastructure/grpc"
 	accountpg "fincore/services/account-service/infrastructure/postgres"
 )
@@ -118,6 +119,10 @@ func main() {
 	openHandler := commands.NewOpenAccountHandler(uow)
 	depositHandler := commands.NewDepositMoneyHandler(uow, ledgerClient)
 	withdrawHandler := commands.NewWithdrawMoneyHandler(uow, ledgerClient)
+
+	// 3b. Projection Worker
+	projectionWorker := workers.NewAccountProjectionWorker(uow.AccountStore(), uow.Projection())
+	go projectionWorker.Start(ctx)
 
 	// 4. Start gRPC Server
 	lis, err := net.Listen("tcp", grpcAddr)

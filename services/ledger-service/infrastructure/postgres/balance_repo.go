@@ -4,14 +4,21 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type BalanceRepo struct {
-	q pgx.Tx
+type Queryer interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func NewBalanceRepo(tx pgx.Tx) *BalanceRepo {
-	return &BalanceRepo{q: tx}
+type BalanceRepo struct {
+	q Queryer
+}
+
+func NewBalanceRepo(q Queryer) *BalanceRepo {
+	return &BalanceRepo{q: q}
 }
 
 func (r *BalanceRepo) GetBalanceKobo(ctx context.Context, accountID string) (int64, error) {

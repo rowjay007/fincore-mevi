@@ -114,6 +114,14 @@ func (m *mockEventStore) Read(ctx context.Context, aggregateID string, fromVersi
 	return res, nil
 }
 
+func (m *mockEventStore) ReadAll(ctx context.Context, fromSequenceExclusive int64, limit int) ([]eventstore.Event, int64, error) {
+	var all []eventstore.Event
+	for _, evs := range m.events {
+		all = append(all, evs...)
+	}
+	return all, fromSequenceExclusive, nil
+}
+
 func (m *mockEventStore) LoadLatestSnapshot(ctx context.Context, aggregateID string) (*eventstore.Snapshot, error) {
 	return nil, nil
 }
