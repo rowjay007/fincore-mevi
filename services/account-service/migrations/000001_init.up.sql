@@ -1,4 +1,5 @@
 create table if not exists event_store_events (
+  sequence bigint generated always as identity,
   id text primary key,
   aggregate_id text not null,
   aggregate_type text not null,
@@ -8,6 +9,12 @@ create table if not exists event_store_events (
   data bytea not null,
   metadata bytea
 );
+
+alter table if exists event_store_events
+  add column if not exists sequence bigint generated always as identity;
+
+create unique index if not exists event_store_events_sequence_uidx
+  on event_store_events(sequence);
 
 create unique index if not exists event_store_events_agg_ver_uidx
   on event_store_events(aggregate_id, version);

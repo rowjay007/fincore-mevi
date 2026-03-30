@@ -2,10 +2,12 @@ package workers
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
 	"fincore/services/account-service/application/ports"
+	"fincore/services/account-service/domain"
 )
 
 type AccountProjectionWorker struct {
@@ -49,6 +51,10 @@ func (w *AccountProjectionWorker) Start(ctx context.Context) {
 	}
 }
 
+func (w *AccountProjectionWorker) ProcessNextBatch(ctx context.Context, lastSeq int64) (int, int64, error) {
+	return w.processNextBatch(ctx, lastSeq)
+}
+
 func (w *AccountProjectionWorker) processNextBatch(ctx context.Context, lastSeq int64) (int, int64, error) {
 	events, nextSeq, err := w.es.ReadAll(ctx, lastSeq, w.batch)
 	if err != nil {
@@ -60,9 +66,45 @@ func (w *AccountProjectionWorker) processNextBatch(ctx context.Context, lastSeq 
 			continue
 		}
 
-		// Standard projection update for every event to keep version current
-		// Note: In a real system, you'd use a dedicated projection update method
-		// that handles concurrency (optimistic locking on version).
+		p, ok, err := w.proj.GetByID(ctx, e.AggregateID)
+		if err != nil {
+			return 0, lastSeq, err
+		}
+		if !ok {
+			p = ports.AccountProjection{AccountID: e.AggregateID}
+		}
+
+		switch e.Type {
+		case "account.opened.v1":
+			var ev domain.AccountOpened
+			if err := json.Unmarshal(e.Data, &ev); err != nil {
+				return 0, lastSeq, err
+			}
+			p.CustomerID = ev.CustomerID.String()
+			p.Status = string(domain.StatusActive)
+		case "account.frozen.v1":
+			p.Status = string(domain.StatusFrozen)
+		case "account.closed.v1":
+			p.Status = string(domain.StatusClosed)
+		case "account.money_deposited.v1":
+			// Status/customer unchanged
+		case "account.money_withdrawn.v1":
+			// Status/customer unchanged
+		default:
+			continue
+		}
+
+		p.Version = e.Version
+		if p.CustomerID == "" {
+			// Can't project without a customer_id; wait until we see account.opened.v1.
+			continue
+		}
+		if p.Status == "" {
+			p.Status = string(domain.StatusActive)
+		}
+		if err := w.proj.Upsert(ctx, p); err != nil {
+			return 0, lastSeq, err
+		}
 	}
 
 	return len(events), nextSeq, nil

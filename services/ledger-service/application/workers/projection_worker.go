@@ -2,10 +2,12 @@ package workers
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
 	"fincore/services/ledger-service/application/ports"
+	"fincore/services/ledger-service/domain"
 )
 
 type LedgerProjectionWorker struct {
@@ -47,6 +49,10 @@ func (w *LedgerProjectionWorker) Start(ctx context.Context) {
 	}
 }
 
+func (w *LedgerProjectionWorker) ProcessNextBatch(ctx context.Context, lastSeq int64) (int, int64, error) {
+	return w.processNextBatch(ctx, lastSeq)
+}
+
 func (w *LedgerProjectionWorker) processNextBatch(ctx context.Context, lastSeq int64) (int, int64, error) {
 	events, nextSeq, err := w.es.ReadAll(ctx, lastSeq, w.batch)
 	if err != nil {
@@ -58,10 +64,22 @@ func (w *LedgerProjectionWorker) processNextBatch(ctx context.Context, lastSeq i
 			continue
 		}
 
-		// In a real system, we'd use these events to update denormalized balance tables
-		// or secondary indices. The current BalanceRepository already updates
-		// during the command phase, but this worker ensures eventually consistent
-		// read models are kept in sync if we had them.
+		if e.Type != "ledger.entry_posted.v1" {
+			continue
+		}
+
+		var ev domain.EntryPosted
+		if err := json.Unmarshal(e.Data, &ev); err != nil {
+			return 0, lastSeq, err
+		}
+
+		delta := ev.AmountKobo
+		if ev.EntryType == domain.EntryTypeWithdrawal {
+			delta = -delta
+		}
+		if err := w.bal.ApplyDelta(ctx, ev.AccountID.String(), delta); err != nil {
+			return 0, lastSeq, err
+		}
 	}
 
 	return len(events), nextSeq, nil

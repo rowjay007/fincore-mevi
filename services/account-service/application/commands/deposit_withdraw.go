@@ -97,7 +97,7 @@ func (h *DepositMoneyHandler) Handle(ctx context.Context, cmd DepositMoney) (*De
 			return fmt.Errorf("append account event: %w", err)
 		}
 		if ver%50 == 0 {
-			if err := saveSnapshot(ctx, es, ag, cmd.AccountID); err != nil {
+			if err := saveSnapshot(ctx, es, ag, cmd.AccountID, ver); err != nil {
 				return err
 			}
 		}
@@ -186,7 +186,7 @@ func (h *WithdrawMoneyHandler) Handle(ctx context.Context, cmd WithdrawMoney) (*
 			return fmt.Errorf("append account event: %w", err)
 		}
 		if ver%50 == 0 {
-			if err := saveSnapshot(ctx, es, ag, cmd.AccountID); err != nil {
+			if err := saveSnapshot(ctx, es, ag, cmd.AccountID, ver); err != nil {
 				return err
 			}
 		}
@@ -265,8 +265,9 @@ func LoadAccount(ctx context.Context, es ports.AccountEventStore, accountID ids.
 	return domain.Rehydrate(des)
 }
 
-func saveSnapshot(ctx context.Context, es ports.AccountEventStore, ag *domain.Account, aggregateID ids.ID) error {
+func saveSnapshot(ctx context.Context, es ports.AccountEventStore, ag *domain.Account, aggregateID ids.ID, version int64) error {
 	s := ag.Snapshot()
+	s.Version = version
 	b, err := json.Marshal(s)
 	if err != nil {
 		return err
@@ -274,7 +275,7 @@ func saveSnapshot(ctx context.Context, es ports.AccountEventStore, ag *domain.Ac
 	return es.SaveSnapshot(ctx, eventstore.Snapshot{
 		AggregateID:   aggregateID.String(),
 		AggregateType: "account",
-		Version:       s.Version,
+		Version:       version,
 		CreatedAt:     time.Now().UTC(),
 		Data:          b,
 	})

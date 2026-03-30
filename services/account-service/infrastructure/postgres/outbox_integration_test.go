@@ -17,6 +17,7 @@ import (
 	"fincore/pkg/postgres"
 	"fincore/services/account-service/application/commands"
 	"fincore/services/account-service/application/ports"
+	"fincore/services/account-service/application/workers"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -219,5 +220,85 @@ func TestTransactionalOutbox_AccountService_RollbackPersistsNeither(t *testing.T
 	}
 	if outboxCount != 0 {
 		t.Fatalf("expected no outbox messages on rollback, got %d", outboxCount)
+	}
+}
+
+func TestAccount_SnapshotAndProjectionRebuild(t *testing.T) {
+	dsn := testDSNAccount()
+	if dsn == "" {
+		t.Skip("set ACCOUNT_TEST_DB_DSN or FINCORE_TEST_DB_DSN to run integration tests")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	pool, err := postgres.NewPool(ctx, postgres.Config{DSN: dsn})
+	if err != nil {
+		t.Fatalf("connect db: %v", err)
+	}
+	defer pool.Close()
+
+	ensureAccountSchema(ctx, pool, t)
+
+	uow := NewUnitOfWork(pool)
+	open := commands.NewOpenAccountHandler(uow)
+	ledger := &stubLedgerClient{}
+	deposit := commands.NewDepositMoneyHandler(uow, ledger)
+
+	custID := ids.New()
+	openRes, err := open.Handle(ctx, commands.OpenAccount{CustomerID: custID, IdempotencyKey: "idem-open-snap-1"})
+	if err != nil {
+		t.Fatalf("open account: %v", err)
+	}
+
+	amt, _ := money.New(1, money.NGN)
+	for i := 0; i < 49; i++ {
+		if _, err := deposit.Handle(ctx, commands.DepositMoney{AccountID: openRes.AccountID, Amount: amt, IdempotencyKey: "idem-dep-snap-" + time.Now().UTC().Add(time.Duration(i)*time.Millisecond).Format(time.RFC3339Nano)}); err != nil {
+			t.Fatalf("deposit %d: %v", i, err)
+		}
+	}
+
+	var snapCount int
+	if err := pool.QueryRow(ctx, `select count(*) from event_store_snapshots where aggregate_id = $1 and version = 50`, openRes.AccountID.String()).Scan(&snapCount); err != nil {
+		t.Fatalf("count snapshots: %v", err)
+	}
+	if snapCount < 1 {
+		t.Fatalf("expected snapshot at version 50")
+	}
+
+	if _, err := pool.Exec(ctx, `truncate table accounts_projection`); err != nil {
+		t.Fatalf("truncate projection: %v", err)
+	}
+
+	w := workers.NewAccountProjectionWorker(uow.AccountStore(), uow.Projection())
+	var seq int64
+	for {
+		processed, nextSeq, err := w.ProcessNextBatch(ctx, seq)
+		if err != nil {
+			t.Fatalf("worker batch: %v", err)
+		}
+		if processed == 0 {
+			break
+		}
+		seq = nextSeq
+	}
+
+	row := pool.QueryRow(ctx, `select customer_id, status, version from accounts_projection where account_id = $1`, openRes.AccountID.String())
+	var customerID, status string
+	var version int64
+	if err := row.Scan(&customerID, &status, &version); err != nil {
+		t.Fatalf("scan projection: %v", err)
+	}
+	if customerID != custID.String() {
+		t.Fatalf("expected customer_id %s, got %s", custID.String(), customerID)
+	}
+	if customerID == "" {
+		t.Fatalf("expected customer_id")
+	}
+	if status != "ACTIVE" {
+		t.Fatalf("expected status ACTIVE, got %s", status)
+	}
+	if version != 50 {
+		t.Fatalf("expected version 50, got %d", version)
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"fincore/pkg/postgres"
 	"fincore/services/ledger-service/application/commands"
 	"fincore/services/ledger-service/application/ports"
+	"fincore/services/ledger-service/application/workers"
 	"fincore/services/ledger-service/domain"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -291,5 +292,75 @@ func TestLedger_InsufficientFundsDoesNotPersist(t *testing.T) {
 	row := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, acct.String())
 	if err := row.Scan(&bal); err == nil {
 		t.Fatalf("expected no balance row")
+	}
+}
+
+func TestLedger_BalanceProjectionRebuild(t *testing.T) {
+	dsn := testDSNLedger()
+	if dsn == "" {
+		t.Skip("set LEDGER_TEST_DB_DSN or FINCORE_TEST_DB_DSN to run integration tests")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	pool, err := postgres.NewPool(ctx, postgres.Config{DSN: dsn})
+	if err != nil {
+		t.Fatalf("connect db: %v", err)
+	}
+	defer pool.Close()
+
+	ensureLedgerSchema(ctx, pool, t)
+
+	uow := NewUnitOfWork(pool)
+	h := commands.NewPostEntryHandler(uow)
+
+	acct := ids.New()
+	amt1000, _ := money.New(1000, money.NGN)
+	amt250, _ := money.New(250, money.NGN)
+
+	if _, err := h.Handle(ctx, commands.PostEntry{IdempotencyKey: "idem-rb-1", AccountID: acct, Type: domain.EntryTypeDeposit, Amount: amt1000, Narration: "n"}); err != nil {
+		t.Fatalf("post entry 1: %v", err)
+	}
+	if _, err := h.Handle(ctx, commands.PostEntry{IdempotencyKey: "idem-rb-2", AccountID: acct, Type: domain.EntryTypeWithdrawal, Amount: amt250, Narration: "n"}); err != nil {
+		t.Fatalf("post entry 2: %v", err)
+	}
+	if _, err := h.Handle(ctx, commands.PostEntry{IdempotencyKey: "idem-rb-3", AccountID: acct, Type: domain.EntryTypeDeposit, Amount: amt250, Narration: "n"}); err != nil {
+		t.Fatalf("post entry 3: %v", err)
+	}
+
+	// Assert command path balance is correct (1000 - 250 + 250 = 1000)
+	var bal int64
+	if err := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, acct.String()).Scan(&bal); err != nil {
+		t.Fatalf("get balance: %v", err)
+	}
+	if bal != 1000 {
+		t.Fatalf("expected balance 1000, got %d", bal)
+	}
+
+	// Now truncate balances and rebuild from event store via projection worker.
+	if _, err := pool.Exec(ctx, `truncate table ledger_account_balances`); err != nil {
+		t.Fatalf("truncate balances: %v", err)
+	}
+
+	w := workers.NewLedgerProjectionWorker(uow.LedgerStore(), uow.Balance())
+	var seq int64
+	for {
+		processed, nextSeq, err := w.ProcessNextBatch(ctx, seq)
+		if err != nil {
+			t.Fatalf("worker batch: %v", err)
+		}
+		if processed == 0 {
+			break
+		}
+		seq = nextSeq
+	}
+
+	bal = 0
+	if err := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, acct.String()).Scan(&bal); err != nil {
+		t.Fatalf("get rebuilt balance: %v", err)
+	}
+	if bal != 1000 {
+		t.Fatalf("expected rebuilt balance 1000, got %d", bal)
 	}
 }
