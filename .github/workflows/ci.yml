@@ -3,7 +3,21 @@ name: ci
 on:
   push:
     branches: ["main"]
+    paths:
+      - "go.mod"
+      - "go.sum"
+      - "proto/**"
+      - "pkg/**"
+      - "services/**"
+      - ".github/workflows/ci.yml"
   pull_request:
+    paths:
+      - "go.mod"
+      - "go.sum"
+      - "proto/**"
+      - "pkg/**"
+      - "services/**"
+      - ".github/workflows/ci.yml"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
