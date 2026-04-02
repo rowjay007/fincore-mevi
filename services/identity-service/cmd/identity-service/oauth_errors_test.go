@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fincore/pkg/security"
 	"io"
 	"net/http"
@@ -9,7 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	authv1 "fincore/gen/go/auth/v1"
+
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -105,5 +111,146 @@ func TestAuthorizeCSRF_MissingTokenRedirectsError(t *testing.T) {
 	}
 	if u.Query().Get("error") != "invalid_request" {
 		t.Fatalf("expected invalid_request, got %q", u.Query().Get("error"))
+	}
+}
+
+type stubAuthClient struct {
+	oauthToken func(ctx context.Context, in *authv1.OAuthTokenRequest, opts ...grpc.CallOption) (*authv1.OAuthTokenResponse, error)
+}
+
+func (s stubAuthClient) OAuthToken(ctx context.Context, in *authv1.OAuthTokenRequest, opts ...grpc.CallOption) (*authv1.OAuthTokenResponse, error) {
+	if s.oauthToken == nil {
+		return nil, status.Error(codes.Unimplemented, "not implemented")
+	}
+	return s.oauthToken(ctx, in, opts...)
+}
+
+func (s stubAuthClient) Register(ctx context.Context, in *authv1.RegisterRequest, opts ...grpc.CallOption) (*authv1.RegisterResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) Login(ctx context.Context, in *authv1.LoginRequest, opts ...grpc.CallOption) (*authv1.LoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) RefreshToken(ctx context.Context, in *authv1.RefreshTokenRequest, opts ...grpc.CallOption) (*authv1.RefreshTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) Logout(ctx context.Context, in *authv1.LogoutRequest, opts ...grpc.CallOption) (*authv1.LogoutResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) LogoutAll(ctx context.Context, in *authv1.LogoutAllRequest, opts ...grpc.CallOption) (*authv1.LogoutAllResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) GrantRole(ctx context.Context, in *authv1.GrantRoleRequest, opts ...grpc.CallOption) (*authv1.GrantRoleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) RevokeRole(ctx context.Context, in *authv1.RevokeRoleRequest, opts ...grpc.CallOption) (*authv1.RevokeRoleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) ListUserRoles(ctx context.Context, in *authv1.ListUserRolesRequest, opts ...grpc.CallOption) (*authv1.ListUserRolesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) ValidateToken(ctx context.Context, in *authv1.ValidateTokenRequest, opts ...grpc.CallOption) (*authv1.ValidateTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) OAuthAuthorize(ctx context.Context, in *authv1.OAuthAuthorizeRequest, opts ...grpc.CallOption) (*authv1.OAuthAuthorizeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) CreateOAuthClient(ctx context.Context, in *authv1.CreateOAuthClientRequest, opts ...grpc.CallOption) (*authv1.CreateOAuthClientResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) GetOAuthClient(ctx context.Context, in *authv1.GetOAuthClientRequest, opts ...grpc.CallOption) (*authv1.GetOAuthClientResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) ListOAuthClients(ctx context.Context, in *authv1.ListOAuthClientsRequest, opts ...grpc.CallOption) (*authv1.ListOAuthClientsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) DeleteOAuthClient(ctx context.Context, in *authv1.DeleteOAuthClientRequest, opts ...grpc.CallOption) (*authv1.DeleteOAuthClientResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) RotateOAuthClientSecret(ctx context.Context, in *authv1.RotateOAuthClientSecretRequest, opts ...grpc.CallOption) (*authv1.RotateOAuthClientSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) GetOAuthConsent(ctx context.Context, in *authv1.GetOAuthConsentRequest, opts ...grpc.CallOption) (*authv1.GetOAuthConsentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func (s stubAuthClient) StoreOAuthConsent(ctx context.Context, in *authv1.StoreOAuthConsentRequest, opts ...grpc.CallOption) (*authv1.StoreOAuthConsentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+func TestOAuthToken_HTTP_InvalidClient_UsesRFCBodyAndWWWAuthenticate(t *testing.T) {
+	client := stubAuthClient{oauthToken: func(ctx context.Context, in *authv1.OAuthTokenRequest, opts ...grpc.CallOption) (*authv1.OAuthTokenResponse, error) {
+		for _, opt := range opts {
+			if ho, ok := opt.(grpc.HeaderCallOption); ok {
+				*ho.HeaderAddr = metadata.Pairs("www-authenticate", "Basic realm=\"oauth\"")
+			}
+		}
+		return nil, status.Error(codes.Unauthenticated, "invalid_client")
+	}}
+	h := newHTTPHandler(http.NewServeMux(), client, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
+
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", "code")
+	form.Set("redirect_uri", "https://app.example/cb")
+	form.Set("client_id", "c1")
+	form.Set("code_verifier", "ver")
+	req := httptest.NewRequest(http.MethodPost, "http://example/oauth/token", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+	if got := w.Header().Get("WWW-Authenticate"); got != "Basic realm=\"oauth\"" {
+		t.Fatalf("expected WWW-Authenticate header, got %q", got)
+	}
+	var body oauthTokenErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if body.Error != "invalid_client" {
+		t.Fatalf("expected invalid_client, got %q", body.Error)
+	}
+}
+
+func TestOAuthToken_HTTP_UnsupportedGrantType_ReturnsUnsupportedGrantType(t *testing.T) {
+	client := stubAuthClient{oauthToken: func(ctx context.Context, in *authv1.OAuthTokenRequest, opts ...grpc.CallOption) (*authv1.OAuthTokenResponse, error) {
+		return nil, status.Error(codes.InvalidArgument, "unsupported grant_type")
+	}}
+	h := newHTTPHandler(http.NewServeMux(), client, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
+
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	req := httptest.NewRequest(http.MethodPost, "http://example/oauth/token", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	var body oauthTokenErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if body.Error != "unsupported_grant_type" {
+		t.Fatalf("expected unsupported_grant_type, got %q", body.Error)
 	}
 }

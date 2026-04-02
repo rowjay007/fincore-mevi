@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	authv1 "fincore/gen/go/auth/v1"
@@ -245,6 +246,51 @@ func oauth2ErrorFromGRPC(err error) (code string, desc string) {
 	}
 }
 
+type oauthTokenErrorResponse struct {
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description,omitempty"`
+}
+
+func writeOAuthTokenError(w http.ResponseWriter, statusCode int, code string, desc string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(oauthTokenErrorResponse{Error: code, ErrorDescription: strings.TrimSpace(desc)})
+}
+
+func oauthTokenErrorFromGRPC(err error) (code string, desc string, httpStatus int) {
+	if err == nil {
+		return "server_error", "", http.StatusInternalServerError
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return "server_error", "", http.StatusInternalServerError
+	}
+	msg := strings.TrimSpace(st.Message())
+
+	switch st.Code() {
+	case codes.Unauthenticated:
+		if msg == "invalid_client" {
+			return "invalid_client", "", http.StatusUnauthorized
+		}
+		return "unauthorized_client", msg, http.StatusUnauthorized
+	case codes.InvalidArgument:
+		if msg == "invalid_grant" {
+			return "invalid_grant", "", http.StatusBadRequest
+		}
+		if strings.Contains(strings.ToLower(msg), "unsupported") && strings.Contains(strings.ToLower(msg), "grant_type") {
+			return "unsupported_grant_type", "", http.StatusBadRequest
+		}
+		return "invalid_request", msg, http.StatusBadRequest
+	case codes.PermissionDenied:
+		return "access_denied", msg, http.StatusForbidden
+	default:
+		if msg == "" {
+			msg = "server error"
+		}
+		return "server_error", msg, http.StatusInternalServerError
+	}
+}
+
 func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string, pool *pgxpool.Pool) *http.ServeMux {
 	h := http.NewServeMux()
 	h.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -269,6 +315,50 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 	store := newBrowserSessionStore(pool, 30*time.Minute)
 	const sessionCookieName = "fincore_authorize_session"
 	const csrfCookieName = "fincore_authorize_csrf"
+	h.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			writeOAuthTokenError(w, http.StatusBadRequest, "invalid_request", "invalid form")
+			return
+		}
+		req := &authv1.OAuthTokenRequest{
+			GrantType:    strings.TrimSpace(r.FormValue("grant_type")),
+			Code:         strings.TrimSpace(r.FormValue("code")),
+			RedirectUri:  strings.TrimSpace(r.FormValue("redirect_uri")),
+			ClientId:     strings.TrimSpace(r.FormValue("client_id")),
+			ClientSecret: strings.TrimSpace(r.FormValue("client_secret")),
+			CodeVerifier: strings.TrimSpace(r.FormValue("code_verifier")),
+		}
+
+		ctx := r.Context()
+		authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+		if authHeader != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, "authorization", authHeader)
+		}
+
+		var hdr metadata.MD
+		res, err := authClient.OAuthToken(ctx, req, grpc.Header(&hdr))
+		if err != nil {
+			if w.Header().Get("WWW-Authenticate") == "" {
+				vals := hdr.Get("www-authenticate")
+				if len(vals) != 0 {
+					if wa := strings.TrimSpace(vals[0]); wa != "" {
+						w.Header().Set("WWW-Authenticate", wa)
+					}
+				}
+			}
+			code, desc, st := oauthTokenErrorFromGRPC(err)
+			writeOAuthTokenError(w, st, code, desc)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(res)
+	})
 	h.Handle("/", gw)
 	h.HandleFunc("/oauth/logout", func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(sessionCookieName)
