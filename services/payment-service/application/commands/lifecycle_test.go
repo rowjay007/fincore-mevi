@@ -33,7 +33,7 @@ func TestPaymentLifecycle(t *testing.T) {
 	proj := &mockProjRepo{data: make(map[string]ports.PaymentProjection)}
 	uow := &mockUoW{es: es, ob: ob, proj: proj}
 
-	initiateH := NewInitiatePaymentHandler(uow)
+	initiateH := NewInitiatePaymentHandler(uow, nil)
 	authH := NewAuthorizePaymentHandler(uow)
 	settleH := NewSettlePaymentHandler(uow)
 

@@ -32,11 +32,12 @@ type InitiatePaymentResult struct {
 }
 
 type InitiatePaymentHandler struct {
-	uow ports.UnitOfWork
+	uow      ports.UnitOfWork
+	temporal ports.TemporalClient
 }
 
-func NewInitiatePaymentHandler(uow ports.UnitOfWork) *InitiatePaymentHandler {
-	return &InitiatePaymentHandler{uow: uow}
+func NewInitiatePaymentHandler(uow ports.UnitOfWork, temporal ports.TemporalClient) *InitiatePaymentHandler {
+	return &InitiatePaymentHandler{uow: uow, temporal: temporal}
 }
 
 type outboxEventEnvelope struct {
@@ -75,6 +76,7 @@ func (h *InitiatePaymentHandler) Handle(ctx context.Context, cmd InitiatePayment
 	}
 
 	var res *InitiatePaymentResult
+	var createdProjection ports.PaymentProjection
 	err := h.uow.WithTx(ctx, func(ctx context.Context, es ports.PaymentEventStore, ob ports.OutboxStore, proj ports.PaymentProjectionRepository) error {
 		p, err := domain.NewPayment(cmd.FromAccountID, cmd.ToAccountID, cmd.Amount, cmd.Narration)
 		if err != nil {
@@ -140,7 +142,7 @@ func (h *InitiatePaymentHandler) Handle(ctx context.Context, cmd InitiatePayment
 			return fmt.Errorf("append events: %w", err)
 		}
 
-		if err := proj.Upsert(ctx, ports.PaymentProjection{
+		createdProjection = ports.PaymentProjection{
 			PaymentID:     p.ID().String(),
 			FromAccountID: cmd.FromAccountID.String(),
 			ToAccountID:   cmd.ToAccountID.String(),
@@ -149,7 +151,8 @@ func (h *InitiatePaymentHandler) Handle(ctx context.Context, cmd InitiatePayment
 			Narration:     cmd.Narration,
 			Status:        string(p.Status()),
 			Version:       p.Version(),
-		}); err != nil {
+		}
+		if err := proj.Upsert(ctx, createdProjection); err != nil {
 			return err
 		}
 
@@ -158,6 +161,36 @@ func (h *InitiatePaymentHandler) Handle(ctx context.Context, cmd InitiatePayment
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if h.temporal != nil {
+		wid, rid, err := h.temporal.StartTransferWorkflow(ctx, ports.TransferWorkflowInput{
+			PaymentID:      res.PaymentID.String(),
+			FromAccountID:  createdProjection.FromAccountID,
+			ToAccountID:    createdProjection.ToAccountID,
+			Currency:       createdProjection.Currency,
+			AmountKobo:     createdProjection.AmountKobo,
+			Narration:      createdProjection.Narration,
+			IdempotencyKey: cmd.IdempotencyKey,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if err := h.uow.WithTx(ctx, func(ctx context.Context, es ports.PaymentEventStore, ob ports.OutboxStore, proj ports.PaymentProjectionRepository) error {
+			cur, ok, err := proj.GetByID(ctx, res.PaymentID.String())
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return errors.New("payment not found")
+			}
+			cur.TemporalWorkflowID = wid
+			cur.TemporalRunID = rid
+			return proj.Upsert(ctx, cur)
+		}); err != nil {
+			return nil, err
+		}
 	}
 	return res, nil
 }

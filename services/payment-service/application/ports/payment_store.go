@@ -19,14 +19,16 @@ type OutboxStore interface {
 }
 
 type PaymentProjection struct {
-	PaymentID     string
-	FromAccountID string
-	ToAccountID   string
-	Currency      string
-	AmountKobo    int64
-	Narration     string
-	Status        string
-	Version       int64
+	PaymentID          string
+	FromAccountID      string
+	ToAccountID        string
+	Currency           string
+	AmountKobo         int64
+	Narration          string
+	Status             string
+	TemporalWorkflowID string
+	TemporalRunID      string
+	Version            int64
 }
 
 type PaymentProjectionRepository interface {

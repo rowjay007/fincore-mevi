@@ -18,11 +18,14 @@ import (
 	"fincore/services/payment-service/application/commands"
 	"fincore/services/payment-service/application/saga"
 	"fincore/services/payment-service/application/workers"
+	"fincore/services/payment-service/application/workflows"
 	paymentgrpc "fincore/services/payment-service/infrastructure/grpc"
 	paymentmsg "fincore/services/payment-service/infrastructure/messaging"
 	paymentpg "fincore/services/payment-service/infrastructure/postgres"
+	paymenttemporal "fincore/services/payment-service/infrastructure/temporal"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"go.temporal.io/sdk/client"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -97,7 +100,30 @@ func main() {
 	defer pool.Close()
 
 	uow := paymentpg.NewUnitOfWork(pool)
-	initiate := commands.NewInitiatePaymentHandler(uow)
+
+	temporalEnabled := strings.TrimSpace(strings.ToLower(os.Getenv("TEMPORAL_ENABLED"))) == "true"
+	temporalAddr := strings.TrimSpace(os.Getenv("TEMPORAL_ADDR"))
+	if temporalAddr == "" {
+		temporalAddr = "temporal:7233"
+	}
+	temporalTaskQueue := strings.TrimSpace(os.Getenv("TEMPORAL_TASK_QUEUE"))
+	if temporalTaskQueue == "" {
+		temporalTaskQueue = "payment-service"
+	}
+
+	var temporalClientAdapter *paymenttemporal.Client
+	var temporalSDK client.Client
+	if temporalEnabled {
+		c, err := client.Dial(client.Options{HostPort: temporalAddr})
+		if err != nil {
+			log.Fatalf("failed to dial temporal (%s): %v", temporalAddr, err)
+		}
+		temporalSDK = c
+		defer temporalSDK.Close()
+		temporalClientAdapter = paymenttemporal.NewClient(temporalSDK, temporalTaskQueue)
+	}
+
+	initiate := commands.NewInitiatePaymentHandler(uow, temporalClientAdapter)
 	authorize := commands.NewAuthorizePaymentHandler(uow)
 	settle := commands.NewSettlePaymentHandler(uow)
 	fail := commands.NewFailPaymentHandler(uow)
@@ -130,6 +156,16 @@ func main() {
 
 	transferSaga := saga.NewTransferSaga(uow, authorize, settle, fail, lc, ac)
 
+	if temporalEnabled {
+		acts := &workflows.TransferActivities{Ledger: lc, Account: ac, Authorize: authorize, Settle: settle, Fail: fail}
+		tw := paymenttemporal.NewWorker(temporalSDK, temporalTaskQueue, acts)
+		go func() {
+			if err := tw.Start(ctx); err != nil {
+				log.Printf("[Temporal] worker stopped: %v", err)
+			}
+		}()
+	}
+
 	// Event Consumer
 	natsUrl := os.Getenv("NATS_URL")
 	if natsUrl == "" {
@@ -140,9 +176,11 @@ func main() {
 		log.Printf("Warning: could not connect to NATS: %v", err)
 	} else {
 		defer natsClient.Close()
-		consumer := paymentmsg.NewEventConsumer(natsClient, transferSaga)
-		if err := consumer.Start(ctx); err != nil {
-			log.Printf("Error starting event consumer: %v", err)
+		if !temporalEnabled {
+			consumer := paymentmsg.NewEventConsumer(natsClient, transferSaga)
+			if err := consumer.Start(ctx); err != nil {
+				log.Printf("Error starting event consumer: %v", err)
+			}
 		}
 
 		// Outbox Worker

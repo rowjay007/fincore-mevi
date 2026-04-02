@@ -46,6 +46,8 @@ create table if not exists payments_projection (
   amount_kobo bigint not null,
   narration text not null,
   status text not null,
+  temporal_workflow_id text,
+  temporal_run_id text,
   version bigint not null,
   updated_at timestamptz not null default now()
 );
