@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fincore/pkg/security"
 	"io"
@@ -252,5 +253,33 @@ func TestOAuthToken_HTTP_UnsupportedGrantType_ReturnsUnsupportedGrantType(t *tes
 	}
 	if body.Error != "unsupported_grant_type" {
 		t.Fatalf("expected unsupported_grant_type, got %q", body.Error)
+	}
+}
+
+func TestOAuthLogoutCookie_SetsSecureWhenTLS(t *testing.T) {
+	h := newHTTPHandler(http.NewServeMux(), stubAuthClient{}, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
+
+	req := httptest.NewRequest(http.MethodPost, "https://example/oauth/logout", nil)
+	req.TLS = &tls.ConnectionState{}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", w.Code)
+	}
+
+	cookies := w.Result().Cookies()
+	found := false
+	for _, c := range cookies {
+		if c.Name == "fincore_authorize_session" {
+			found = true
+			if !c.Secure {
+				t.Fatalf("expected Secure cookie")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected session cookie")
 	}
 }

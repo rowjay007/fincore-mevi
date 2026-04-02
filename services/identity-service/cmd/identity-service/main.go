@@ -365,7 +365,7 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 		if err == nil {
 			store.del(r.Context(), c.Value)
 		}
-		http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+		http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil})
 		w.WriteHeader(http.StatusNoContent)
 	})
 	h.HandleFunc("/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
@@ -549,6 +549,9 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 					return
 				}
 
+				if strings.TrimSpace(sessionID) != "" {
+					store.del(r.Context(), sessionID)
+				}
 				sessionID, _, _ = store.put(r.Context(), userID, loginRes.AccessToken)
 				http.SetCookie(w, &http.Cookie{
 					Name:     sessionCookieName,
