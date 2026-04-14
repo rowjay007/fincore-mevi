@@ -37,6 +37,7 @@ const (
 	AuthService_RotateOAuthClientSecret_FullMethodName = "/fincore.auth.v1.AuthService/RotateOAuthClientSecret"
 	AuthService_GetOAuthConsent_FullMethodName         = "/fincore.auth.v1.AuthService/GetOAuthConsent"
 	AuthService_StoreOAuthConsent_FullMethodName       = "/fincore.auth.v1.AuthService/StoreOAuthConsent"
+	AuthService_ListOAuthConsentHistory_FullMethodName = "/fincore.auth.v1.AuthService/ListOAuthConsentHistory"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -61,6 +62,7 @@ type AuthServiceClient interface {
 	RotateOAuthClientSecret(ctx context.Context, in *RotateOAuthClientSecretRequest, opts ...grpc.CallOption) (*RotateOAuthClientSecretResponse, error)
 	GetOAuthConsent(ctx context.Context, in *GetOAuthConsentRequest, opts ...grpc.CallOption) (*GetOAuthConsentResponse, error)
 	StoreOAuthConsent(ctx context.Context, in *StoreOAuthConsentRequest, opts ...grpc.CallOption) (*StoreOAuthConsentResponse, error)
+	ListOAuthConsentHistory(ctx context.Context, in *ListOAuthConsentHistoryRequest, opts ...grpc.CallOption) (*ListOAuthConsentHistoryResponse, error)
 }
 
 type authServiceClient struct {
@@ -251,6 +253,16 @@ func (c *authServiceClient) StoreOAuthConsent(ctx context.Context, in *StoreOAut
 	return out, nil
 }
 
+func (c *authServiceClient) ListOAuthConsentHistory(ctx context.Context, in *ListOAuthConsentHistoryRequest, opts ...grpc.CallOption) (*ListOAuthConsentHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOAuthConsentHistoryResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListOAuthConsentHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -273,6 +285,7 @@ type AuthServiceServer interface {
 	RotateOAuthClientSecret(context.Context, *RotateOAuthClientSecretRequest) (*RotateOAuthClientSecretResponse, error)
 	GetOAuthConsent(context.Context, *GetOAuthConsentRequest) (*GetOAuthConsentResponse, error)
 	StoreOAuthConsent(context.Context, *StoreOAuthConsentRequest) (*StoreOAuthConsentResponse, error)
+	ListOAuthConsentHistory(context.Context, *ListOAuthConsentHistoryRequest) (*ListOAuthConsentHistoryResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -336,6 +349,9 @@ func (UnimplementedAuthServiceServer) GetOAuthConsent(context.Context, *GetOAuth
 }
 func (UnimplementedAuthServiceServer) StoreOAuthConsent(context.Context, *StoreOAuthConsentRequest) (*StoreOAuthConsentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StoreOAuthConsent not implemented")
+}
+func (UnimplementedAuthServiceServer) ListOAuthConsentHistory(context.Context, *ListOAuthConsentHistoryRequest) (*ListOAuthConsentHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOAuthConsentHistory not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -682,6 +698,24 @@ func _AuthService_StoreOAuthConsent_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_ListOAuthConsentHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOAuthConsentHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListOAuthConsentHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListOAuthConsentHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListOAuthConsentHistory(ctx, req.(*ListOAuthConsentHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -760,6 +794,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StoreOAuthConsent",
 			Handler:    _AuthService_StoreOAuthConsent_Handler,
+		},
+		{
+			MethodName: "ListOAuthConsentHistory",
+			Handler:    _AuthService_ListOAuthConsentHistory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

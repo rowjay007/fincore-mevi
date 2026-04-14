@@ -194,6 +194,10 @@ func (s stubAuthClient) StoreOAuthConsent(ctx context.Context, in *authv1.StoreO
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
+func (s stubAuthClient) ListOAuthConsentHistory(ctx context.Context, in *authv1.ListOAuthConsentHistoryRequest, opts ...grpc.CallOption) (*authv1.ListOAuthConsentHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
 func TestOAuthToken_HTTP_InvalidClient_UsesRFCBodyAndWWWAuthenticate(t *testing.T) {
 	client := stubAuthClient{oauthToken: func(ctx context.Context, in *authv1.OAuthTokenRequest, opts ...grpc.CallOption) (*authv1.OAuthTokenResponse, error) {
 		for _, opt := range opts {

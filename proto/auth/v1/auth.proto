@@ -3,6 +3,7 @@ syntax = "proto3";
 package fincore.auth.v1;
 
 import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "fincore/gen/go/auth/v1;authv1";
 
@@ -111,6 +112,12 @@ service AuthService {
 
   rpc GetOAuthConsent(GetOAuthConsentRequest) returns (GetOAuthConsentResponse);
   rpc StoreOAuthConsent(StoreOAuthConsentRequest) returns (StoreOAuthConsentResponse);
+
+  rpc ListOAuthConsentHistory(ListOAuthConsentHistoryRequest) returns (ListOAuthConsentHistoryResponse) {
+    option (google.api.http) = {
+      get: "/v1/auth/admin/oauth/consents/{user_id}/{client_id}/history"
+    };
+  }
 }
 
 message RegisterRequest {
@@ -293,6 +300,21 @@ message StoreOAuthConsentRequest {
 
 message StoreOAuthConsentResponse {
   bool success = 1;
+}
+
+message ListOAuthConsentHistoryRequest {
+  string user_id = 1;
+  string client_id = 2;
+  int32 limit = 3;
+}
+
+message OAuthConsentHistoryEntry {
+  repeated string scopes = 1;
+  google.protobuf.Timestamp created_at = 2;
+}
+
+message ListOAuthConsentHistoryResponse {
+  repeated OAuthConsentHistoryEntry entries = 1;
 }
 message RotateOAuthClientSecretResponse {
   string client_secret = 1;

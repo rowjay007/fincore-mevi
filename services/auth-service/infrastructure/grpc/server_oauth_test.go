@@ -82,6 +82,41 @@ func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
 	}
 }
 
+func TestListOAuthConsentHistory_DefaultLimitAndOrdering(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	now := time.Now().UTC()
+	rows := pgxmock.NewRows([]string{"scopes", "created_at"}).
+		AddRow([]string{"openid"}, now).
+		AddRow([]string{"openid", "profile"}, now.Add(-time.Minute))
+
+	db.ExpectQuery("select scopes, created_at").WithArgs("u1", "c1", 50).WillReturnRows(rows)
+
+	res, err := s.ListOAuthConsentHistory(context.Background(), &authv1.ListOAuthConsentHistoryRequest{UserId: "u1", ClientId: "c1"})
+	if err != nil {
+		t.Fatalf("ListOAuthConsentHistory: %v", err)
+	}
+	if res == nil || len(res.Entries) != 2 {
+		t.Fatalf("expected 2 entries")
+	}
+	if res.Entries[0].CreatedAt == nil || res.Entries[1].CreatedAt == nil {
+		t.Fatalf("expected timestamps")
+	}
+	if res.Entries[0].CreatedAt.AsTime() != now {
+		t.Fatalf("expected first entry time %v, got %v", now, res.Entries[0].CreatedAt.AsTime())
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestStoreOAuthConsent_AppendsHistoryOnCreate(t *testing.T) {
 	db, err := pgxmock.NewPool()
 	if err != nil {

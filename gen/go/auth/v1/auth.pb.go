@@ -10,6 +10,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -1910,6 +1911,162 @@ func (x *StoreOAuthConsentResponse) GetSuccess() bool {
 	return false
 }
 
+type ListOAuthConsentHistoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ClientId      string                 `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOAuthConsentHistoryRequest) Reset() {
+	*x = ListOAuthConsentHistoryRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOAuthConsentHistoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOAuthConsentHistoryRequest) ProtoMessage() {}
+
+func (x *ListOAuthConsentHistoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOAuthConsentHistoryRequest.ProtoReflect.Descriptor instead.
+func (*ListOAuthConsentHistoryRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ListOAuthConsentHistoryRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ListOAuthConsentHistoryRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *ListOAuthConsentHistoryRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type OAuthConsentHistoryEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scopes        []string               `protobuf:"bytes,1,rep,name=scopes,proto3" json:"scopes,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OAuthConsentHistoryEntry) Reset() {
+	*x = OAuthConsentHistoryEntry{}
+	mi := &file_auth_v1_auth_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OAuthConsentHistoryEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OAuthConsentHistoryEntry) ProtoMessage() {}
+
+func (x *OAuthConsentHistoryEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OAuthConsentHistoryEntry.ProtoReflect.Descriptor instead.
+func (*OAuthConsentHistoryEntry) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *OAuthConsentHistoryEntry) GetScopes() []string {
+	if x != nil {
+		return x.Scopes
+	}
+	return nil
+}
+
+func (x *OAuthConsentHistoryEntry) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type ListOAuthConsentHistoryResponse struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Entries       []*OAuthConsentHistoryEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOAuthConsentHistoryResponse) Reset() {
+	*x = ListOAuthConsentHistoryResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOAuthConsentHistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOAuthConsentHistoryResponse) ProtoMessage() {}
+
+func (x *ListOAuthConsentHistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOAuthConsentHistoryResponse.ProtoReflect.Descriptor instead.
+func (*ListOAuthConsentHistoryResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ListOAuthConsentHistoryResponse) GetEntries() []*OAuthConsentHistoryEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
 type RotateOAuthClientSecretResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ClientSecret  string                 `protobuf:"bytes,1,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
@@ -1919,7 +2076,7 @@ type RotateOAuthClientSecretResponse struct {
 
 func (x *RotateOAuthClientSecretResponse) Reset() {
 	*x = RotateOAuthClientSecretResponse{}
-	mi := &file_auth_v1_auth_proto_msgTypes[36]
+	mi := &file_auth_v1_auth_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1931,7 +2088,7 @@ func (x *RotateOAuthClientSecretResponse) String() string {
 func (*RotateOAuthClientSecretResponse) ProtoMessage() {}
 
 func (x *RotateOAuthClientSecretResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_v1_auth_proto_msgTypes[36]
+	mi := &file_auth_v1_auth_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1944,7 +2101,7 @@ func (x *RotateOAuthClientSecretResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateOAuthClientSecretResponse.ProtoReflect.Descriptor instead.
 func (*RotateOAuthClientSecretResponse) Descriptor() ([]byte, []int) {
-	return file_auth_v1_auth_proto_rawDescGZIP(), []int{36}
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *RotateOAuthClientSecretResponse) GetClientSecret() string {
@@ -1958,7 +2115,7 @@ var File_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x12auth/v1/auth.proto\x12\x0ffincore.auth.v1\x1a\x1cgoogle/api/annotations.proto\"`\n" +
+	"\x12auth/v1/auth.proto\x12\x0ffincore.auth.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"`\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
@@ -2073,9 +2230,19 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\tclient_id\x18\x02 \x01(\tR\bclientId\x12\x16\n" +
 	"\x06scopes\x18\x03 \x03(\tR\x06scopes\"5\n" +
 	"\x19StoreOAuthConsentResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"F\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"l\n" +
+	"\x1eListOAuthConsentHistoryRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tclient_id\x18\x02 \x01(\tR\bclientId\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"m\n" +
+	"\x18OAuthConsentHistoryEntry\x12\x16\n" +
+	"\x06scopes\x18\x01 \x03(\tR\x06scopes\x129\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"f\n" +
+	"\x1fListOAuthConsentHistoryResponse\x12C\n" +
+	"\aentries\x18\x01 \x03(\v2).fincore.auth.v1.OAuthConsentHistoryEntryR\aentries\"F\n" +
 	"\x1fRotateOAuthClientSecretResponse\x12#\n" +
-	"\rclient_secret\x18\x01 \x01(\tR\fclientSecret2\x9b\x12\n" +
+	"\rclient_secret\x18\x01 \x01(\tR\fclientSecret2\xdf\x13\n" +
 	"\vAuthService\x12m\n" +
 	"\bRegister\x12 .fincore.auth.v1.RegisterRequest\x1a!.fincore.auth.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12a\n" +
 	"\x05Login\x12\x1d.fincore.auth.v1.LoginRequest\x1a\x1e.fincore.auth.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12x\n" +
@@ -2096,7 +2263,8 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x11DeleteOAuthClient\x12).fincore.auth.v1.DeleteOAuthClientRequest\x1a*.fincore.auth.v1.DeleteOAuthClientResponse\"0\x82\xd3\xe4\x93\x02**(/v1/auth/admin/oauth/clients/{client_id}\x12\xbf\x01\n" +
 	"\x17RotateOAuthClientSecret\x12/.fincore.auth.v1.RotateOAuthClientSecretRequest\x1a0.fincore.auth.v1.RotateOAuthClientSecretResponse\"A\x82\xd3\xe4\x93\x02;:\x01*\"6/v1/auth/admin/oauth/clients/{client_id}/secret:rotate\x12d\n" +
 	"\x0fGetOAuthConsent\x12'.fincore.auth.v1.GetOAuthConsentRequest\x1a(.fincore.auth.v1.GetOAuthConsentResponse\x12j\n" +
-	"\x11StoreOAuthConsent\x12).fincore.auth.v1.StoreOAuthConsentRequest\x1a*.fincore.auth.v1.StoreOAuthConsentResponseB\x1fZ\x1dfincore/gen/go/auth/v1;authv1b\x06proto3"
+	"\x11StoreOAuthConsent\x12).fincore.auth.v1.StoreOAuthConsentRequest\x1a*.fincore.auth.v1.StoreOAuthConsentResponse\x12\xc1\x01\n" +
+	"\x17ListOAuthConsentHistory\x12/.fincore.auth.v1.ListOAuthConsentHistoryRequest\x1a0.fincore.auth.v1.ListOAuthConsentHistoryResponse\"C\x82\xd3\xe4\x93\x02=\x12;/v1/auth/admin/oauth/consents/{user_id}/{client_id}/historyB\x1fZ\x1dfincore/gen/go/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -2110,7 +2278,7 @@ func file_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_auth_v1_auth_proto_rawDescData
 }
 
-var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
 var file_auth_v1_auth_proto_goTypes = []any{
 	(*RegisterRequest)(nil),                 // 0: fincore.auth.v1.RegisterRequest
 	(*RegisterResponse)(nil),                // 1: fincore.auth.v1.RegisterResponse
@@ -2148,53 +2316,61 @@ var file_auth_v1_auth_proto_goTypes = []any{
 	(*GetOAuthConsentResponse)(nil),         // 33: fincore.auth.v1.GetOAuthConsentResponse
 	(*StoreOAuthConsentRequest)(nil),        // 34: fincore.auth.v1.StoreOAuthConsentRequest
 	(*StoreOAuthConsentResponse)(nil),       // 35: fincore.auth.v1.StoreOAuthConsentResponse
-	(*RotateOAuthClientSecretResponse)(nil), // 36: fincore.auth.v1.RotateOAuthClientSecretResponse
+	(*ListOAuthConsentHistoryRequest)(nil),  // 36: fincore.auth.v1.ListOAuthConsentHistoryRequest
+	(*OAuthConsentHistoryEntry)(nil),        // 37: fincore.auth.v1.OAuthConsentHistoryEntry
+	(*ListOAuthConsentHistoryResponse)(nil), // 38: fincore.auth.v1.ListOAuthConsentHistoryResponse
+	(*RotateOAuthClientSecretResponse)(nil), // 39: fincore.auth.v1.RotateOAuthClientSecretResponse
+	(*timestamppb.Timestamp)(nil),           // 40: google.protobuf.Timestamp
 }
 var file_auth_v1_auth_proto_depIdxs = []int32{
 	22, // 0: fincore.auth.v1.CreateOAuthClientResponse.client:type_name -> fincore.auth.v1.OAuthClient
 	22, // 1: fincore.auth.v1.GetOAuthClientResponse.client:type_name -> fincore.auth.v1.OAuthClient
 	22, // 2: fincore.auth.v1.ListOAuthClientsResponse.clients:type_name -> fincore.auth.v1.OAuthClient
-	0,  // 3: fincore.auth.v1.AuthService.Register:input_type -> fincore.auth.v1.RegisterRequest
-	2,  // 4: fincore.auth.v1.AuthService.Login:input_type -> fincore.auth.v1.LoginRequest
-	4,  // 5: fincore.auth.v1.AuthService.RefreshToken:input_type -> fincore.auth.v1.RefreshTokenRequest
-	6,  // 6: fincore.auth.v1.AuthService.Logout:input_type -> fincore.auth.v1.LogoutRequest
-	8,  // 7: fincore.auth.v1.AuthService.LogoutAll:input_type -> fincore.auth.v1.LogoutAllRequest
-	12, // 8: fincore.auth.v1.AuthService.GrantRole:input_type -> fincore.auth.v1.GrantRoleRequest
-	14, // 9: fincore.auth.v1.AuthService.RevokeRole:input_type -> fincore.auth.v1.RevokeRoleRequest
-	16, // 10: fincore.auth.v1.AuthService.ListUserRoles:input_type -> fincore.auth.v1.ListUserRolesRequest
-	10, // 11: fincore.auth.v1.AuthService.ValidateToken:input_type -> fincore.auth.v1.ValidateTokenRequest
-	18, // 12: fincore.auth.v1.AuthService.OAuthAuthorize:input_type -> fincore.auth.v1.OAuthAuthorizeRequest
-	20, // 13: fincore.auth.v1.AuthService.OAuthToken:input_type -> fincore.auth.v1.OAuthTokenRequest
-	23, // 14: fincore.auth.v1.AuthService.CreateOAuthClient:input_type -> fincore.auth.v1.CreateOAuthClientRequest
-	25, // 15: fincore.auth.v1.AuthService.GetOAuthClient:input_type -> fincore.auth.v1.GetOAuthClientRequest
-	27, // 16: fincore.auth.v1.AuthService.ListOAuthClients:input_type -> fincore.auth.v1.ListOAuthClientsRequest
-	29, // 17: fincore.auth.v1.AuthService.DeleteOAuthClient:input_type -> fincore.auth.v1.DeleteOAuthClientRequest
-	31, // 18: fincore.auth.v1.AuthService.RotateOAuthClientSecret:input_type -> fincore.auth.v1.RotateOAuthClientSecretRequest
-	32, // 19: fincore.auth.v1.AuthService.GetOAuthConsent:input_type -> fincore.auth.v1.GetOAuthConsentRequest
-	34, // 20: fincore.auth.v1.AuthService.StoreOAuthConsent:input_type -> fincore.auth.v1.StoreOAuthConsentRequest
-	1,  // 21: fincore.auth.v1.AuthService.Register:output_type -> fincore.auth.v1.RegisterResponse
-	3,  // 22: fincore.auth.v1.AuthService.Login:output_type -> fincore.auth.v1.LoginResponse
-	5,  // 23: fincore.auth.v1.AuthService.RefreshToken:output_type -> fincore.auth.v1.RefreshTokenResponse
-	7,  // 24: fincore.auth.v1.AuthService.Logout:output_type -> fincore.auth.v1.LogoutResponse
-	9,  // 25: fincore.auth.v1.AuthService.LogoutAll:output_type -> fincore.auth.v1.LogoutAllResponse
-	13, // 26: fincore.auth.v1.AuthService.GrantRole:output_type -> fincore.auth.v1.GrantRoleResponse
-	15, // 27: fincore.auth.v1.AuthService.RevokeRole:output_type -> fincore.auth.v1.RevokeRoleResponse
-	17, // 28: fincore.auth.v1.AuthService.ListUserRoles:output_type -> fincore.auth.v1.ListUserRolesResponse
-	11, // 29: fincore.auth.v1.AuthService.ValidateToken:output_type -> fincore.auth.v1.ValidateTokenResponse
-	19, // 30: fincore.auth.v1.AuthService.OAuthAuthorize:output_type -> fincore.auth.v1.OAuthAuthorizeResponse
-	21, // 31: fincore.auth.v1.AuthService.OAuthToken:output_type -> fincore.auth.v1.OAuthTokenResponse
-	24, // 32: fincore.auth.v1.AuthService.CreateOAuthClient:output_type -> fincore.auth.v1.CreateOAuthClientResponse
-	26, // 33: fincore.auth.v1.AuthService.GetOAuthClient:output_type -> fincore.auth.v1.GetOAuthClientResponse
-	28, // 34: fincore.auth.v1.AuthService.ListOAuthClients:output_type -> fincore.auth.v1.ListOAuthClientsResponse
-	30, // 35: fincore.auth.v1.AuthService.DeleteOAuthClient:output_type -> fincore.auth.v1.DeleteOAuthClientResponse
-	36, // 36: fincore.auth.v1.AuthService.RotateOAuthClientSecret:output_type -> fincore.auth.v1.RotateOAuthClientSecretResponse
-	33, // 37: fincore.auth.v1.AuthService.GetOAuthConsent:output_type -> fincore.auth.v1.GetOAuthConsentResponse
-	35, // 38: fincore.auth.v1.AuthService.StoreOAuthConsent:output_type -> fincore.auth.v1.StoreOAuthConsentResponse
-	21, // [21:39] is the sub-list for method output_type
-	3,  // [3:21] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	40, // 3: fincore.auth.v1.OAuthConsentHistoryEntry.created_at:type_name -> google.protobuf.Timestamp
+	37, // 4: fincore.auth.v1.ListOAuthConsentHistoryResponse.entries:type_name -> fincore.auth.v1.OAuthConsentHistoryEntry
+	0,  // 5: fincore.auth.v1.AuthService.Register:input_type -> fincore.auth.v1.RegisterRequest
+	2,  // 6: fincore.auth.v1.AuthService.Login:input_type -> fincore.auth.v1.LoginRequest
+	4,  // 7: fincore.auth.v1.AuthService.RefreshToken:input_type -> fincore.auth.v1.RefreshTokenRequest
+	6,  // 8: fincore.auth.v1.AuthService.Logout:input_type -> fincore.auth.v1.LogoutRequest
+	8,  // 9: fincore.auth.v1.AuthService.LogoutAll:input_type -> fincore.auth.v1.LogoutAllRequest
+	12, // 10: fincore.auth.v1.AuthService.GrantRole:input_type -> fincore.auth.v1.GrantRoleRequest
+	14, // 11: fincore.auth.v1.AuthService.RevokeRole:input_type -> fincore.auth.v1.RevokeRoleRequest
+	16, // 12: fincore.auth.v1.AuthService.ListUserRoles:input_type -> fincore.auth.v1.ListUserRolesRequest
+	10, // 13: fincore.auth.v1.AuthService.ValidateToken:input_type -> fincore.auth.v1.ValidateTokenRequest
+	18, // 14: fincore.auth.v1.AuthService.OAuthAuthorize:input_type -> fincore.auth.v1.OAuthAuthorizeRequest
+	20, // 15: fincore.auth.v1.AuthService.OAuthToken:input_type -> fincore.auth.v1.OAuthTokenRequest
+	23, // 16: fincore.auth.v1.AuthService.CreateOAuthClient:input_type -> fincore.auth.v1.CreateOAuthClientRequest
+	25, // 17: fincore.auth.v1.AuthService.GetOAuthClient:input_type -> fincore.auth.v1.GetOAuthClientRequest
+	27, // 18: fincore.auth.v1.AuthService.ListOAuthClients:input_type -> fincore.auth.v1.ListOAuthClientsRequest
+	29, // 19: fincore.auth.v1.AuthService.DeleteOAuthClient:input_type -> fincore.auth.v1.DeleteOAuthClientRequest
+	31, // 20: fincore.auth.v1.AuthService.RotateOAuthClientSecret:input_type -> fincore.auth.v1.RotateOAuthClientSecretRequest
+	32, // 21: fincore.auth.v1.AuthService.GetOAuthConsent:input_type -> fincore.auth.v1.GetOAuthConsentRequest
+	34, // 22: fincore.auth.v1.AuthService.StoreOAuthConsent:input_type -> fincore.auth.v1.StoreOAuthConsentRequest
+	36, // 23: fincore.auth.v1.AuthService.ListOAuthConsentHistory:input_type -> fincore.auth.v1.ListOAuthConsentHistoryRequest
+	1,  // 24: fincore.auth.v1.AuthService.Register:output_type -> fincore.auth.v1.RegisterResponse
+	3,  // 25: fincore.auth.v1.AuthService.Login:output_type -> fincore.auth.v1.LoginResponse
+	5,  // 26: fincore.auth.v1.AuthService.RefreshToken:output_type -> fincore.auth.v1.RefreshTokenResponse
+	7,  // 27: fincore.auth.v1.AuthService.Logout:output_type -> fincore.auth.v1.LogoutResponse
+	9,  // 28: fincore.auth.v1.AuthService.LogoutAll:output_type -> fincore.auth.v1.LogoutAllResponse
+	13, // 29: fincore.auth.v1.AuthService.GrantRole:output_type -> fincore.auth.v1.GrantRoleResponse
+	15, // 30: fincore.auth.v1.AuthService.RevokeRole:output_type -> fincore.auth.v1.RevokeRoleResponse
+	17, // 31: fincore.auth.v1.AuthService.ListUserRoles:output_type -> fincore.auth.v1.ListUserRolesResponse
+	11, // 32: fincore.auth.v1.AuthService.ValidateToken:output_type -> fincore.auth.v1.ValidateTokenResponse
+	19, // 33: fincore.auth.v1.AuthService.OAuthAuthorize:output_type -> fincore.auth.v1.OAuthAuthorizeResponse
+	21, // 34: fincore.auth.v1.AuthService.OAuthToken:output_type -> fincore.auth.v1.OAuthTokenResponse
+	24, // 35: fincore.auth.v1.AuthService.CreateOAuthClient:output_type -> fincore.auth.v1.CreateOAuthClientResponse
+	26, // 36: fincore.auth.v1.AuthService.GetOAuthClient:output_type -> fincore.auth.v1.GetOAuthClientResponse
+	28, // 37: fincore.auth.v1.AuthService.ListOAuthClients:output_type -> fincore.auth.v1.ListOAuthClientsResponse
+	30, // 38: fincore.auth.v1.AuthService.DeleteOAuthClient:output_type -> fincore.auth.v1.DeleteOAuthClientResponse
+	39, // 39: fincore.auth.v1.AuthService.RotateOAuthClientSecret:output_type -> fincore.auth.v1.RotateOAuthClientSecretResponse
+	33, // 40: fincore.auth.v1.AuthService.GetOAuthConsent:output_type -> fincore.auth.v1.GetOAuthConsentResponse
+	35, // 41: fincore.auth.v1.AuthService.StoreOAuthConsent:output_type -> fincore.auth.v1.StoreOAuthConsentResponse
+	38, // 42: fincore.auth.v1.AuthService.ListOAuthConsentHistory:output_type -> fincore.auth.v1.ListOAuthConsentHistoryResponse
+	24, // [24:43] is the sub-list for method output_type
+	5,  // [5:24] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_auth_v1_auth_proto_init() }
@@ -2208,7 +2384,7 @@ func file_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_v1_auth_proto_rawDesc), len(file_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   37,
+			NumMessages:   40,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

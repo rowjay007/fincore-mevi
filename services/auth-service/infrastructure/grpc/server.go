@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func invalidArg(msg string) error  { return status.Error(codes.InvalidArgument, msg) }
@@ -384,6 +385,49 @@ func (s *Server) StoreOAuthConsent(ctx context.Context, req *authv1.StoreOAuthCo
 	}
 
 	return &authv1.StoreOAuthConsentResponse{Success: true}, nil
+}
+
+func (s *Server) ListOAuthConsentHistory(ctx context.Context, req *authv1.ListOAuthConsentHistoryRequest) (*authv1.ListOAuthConsentHistoryResponse, error) {
+	userID := strings.TrimSpace(req.UserId)
+	clientID := strings.TrimSpace(req.ClientId)
+	if userID == "" || clientID == "" {
+		return nil, invalidArg("user_id and client_id required")
+	}
+
+	limit := int(req.Limit)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	rows, err := s.db.Query(ctx, `
+		select scopes, created_at
+		from oauth_consent_history
+		where user_id = $1 and client_id = $2
+		order by created_at desc, id desc
+		limit $3
+	`, userID, clientID, limit)
+	if err != nil {
+		return nil, internal(err)
+	}
+	defer rows.Close()
+
+	entries := make([]*authv1.OAuthConsentHistoryEntry, 0)
+	for rows.Next() {
+		var scopes []string
+		var createdAt time.Time
+		if err := rows.Scan(&scopes, &createdAt); err != nil {
+			return nil, internal(err)
+		}
+		entries = append(entries, &authv1.OAuthConsentHistoryEntry{Scopes: scopes, CreatedAt: timestamppb.New(createdAt)})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, internal(err)
+	}
+
+	return &authv1.ListOAuthConsentHistoryResponse{Entries: entries}, nil
 }
 
 func equalStringSets(a []string, b []string) bool {

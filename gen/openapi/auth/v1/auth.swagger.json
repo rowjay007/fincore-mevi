@@ -262,6 +262,49 @@
         ]
       }
     },
+    "/v1/auth/admin/oauth/consents/{userId}/{clientId}/history": {
+      "get": {
+        "operationId": "AuthService_ListOAuthConsentHistory",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListOAuthConsentHistoryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
     "/v1/auth/admin/users/{userId}/roles": {
       "get": {
         "operationId": "AuthService_ListUserRoles",
@@ -647,6 +690,18 @@
         }
       }
     },
+    "v1ListOAuthConsentHistoryResponse": {
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1OAuthConsentHistoryEntry"
+          }
+        }
+      }
+    },
     "v1ListUserRolesResponse": {
       "type": "object",
       "properties": {
@@ -757,6 +812,21 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "v1OAuthConsentHistoryEntry": {
+      "type": "object",
+      "properties": {
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
