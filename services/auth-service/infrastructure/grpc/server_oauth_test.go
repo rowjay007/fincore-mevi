@@ -82,6 +82,82 @@ func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
 	}
 }
 
+func TestStoreOAuthConsent_AppendsHistoryOnCreate(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	db.ExpectBegin()
+	db.ExpectQuery("select scopes from oauth_consents").WithArgs("u1", "c1").WillReturnError(pgx.ErrNoRows)
+	db.ExpectExec("insert into oauth_consents").WithArgs("u1", "c1", []string{"openid"}).WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	db.ExpectExec("insert into oauth_consent_history").WithArgs("u1", "c1", []string{"openid"}).WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	db.ExpectCommit()
+
+	_, err = s.StoreOAuthConsent(context.Background(), &authv1.StoreOAuthConsentRequest{UserId: "u1", ClientId: "c1", Scopes: []string{"openid"}})
+	if err != nil {
+		t.Fatalf("StoreOAuthConsent: %v", err)
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestStoreOAuthConsent_AppendsHistoryOnChange(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	db.ExpectBegin()
+	db.ExpectQuery("select scopes from oauth_consents").WithArgs("u1", "c1").
+		WillReturnRows(pgxmock.NewRows([]string{"scopes"}).AddRow([]string{"openid"}))
+	db.ExpectExec("insert into oauth_consents").WithArgs("u1", "c1", []string{"openid", "profile"}).WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	db.ExpectExec("insert into oauth_consent_history").WithArgs("u1", "c1", []string{"openid", "profile"}).WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	db.ExpectCommit()
+
+	_, err = s.StoreOAuthConsent(context.Background(), &authv1.StoreOAuthConsentRequest{UserId: "u1", ClientId: "c1", Scopes: []string{"openid", "profile"}})
+	if err != nil {
+		t.Fatalf("StoreOAuthConsent: %v", err)
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestStoreOAuthConsent_DoesNotAppendHistoryOnNoop(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthUserTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	db.ExpectBegin()
+	db.ExpectQuery("select scopes from oauth_consents").WithArgs("u1", "c1").
+		WillReturnRows(pgxmock.NewRows([]string{"scopes"}).AddRow([]string{"openid", "profile"}))
+	db.ExpectExec("insert into oauth_consents").WithArgs("u1", "c1", []string{"profile", "openid"}).WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	db.ExpectCommit()
+
+	_, err = s.StoreOAuthConsent(context.Background(), &authv1.StoreOAuthConsentRequest{UserId: "u1", ClientId: "c1", Scopes: []string{"profile", "openid"}})
+	if err != nil {
+		t.Fatalf("StoreOAuthConsent: %v", err)
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestOAuthToken_UnknownClient_ReturnsInvalidClient(t *testing.T) {
 	db, err := pgxmock.NewPool()
 	if err != nil {

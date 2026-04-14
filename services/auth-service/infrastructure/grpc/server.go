@@ -348,7 +348,21 @@ func (s *Server) StoreOAuthConsent(ctx context.Context, req *authv1.StoreOAuthCo
 		return nil, invalidArg("user_id and client_id required")
 	}
 
-	_, err := s.db.Exec(ctx, `
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, internal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var existingScopes []string
+	err = tx.QueryRow(ctx, `select scopes from oauth_consents where user_id = $1 and client_id = $2 for update`, userID, clientID).Scan(&existingScopes)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, internal(err)
+	}
+
+	changed := errors.Is(err, pgx.ErrNoRows) || !equalStringSets(existingScopes, req.Scopes)
+
+	_, err = tx.Exec(ctx, `
 		insert into oauth_consents (user_id, client_id, scopes, updated_at)
 		values ($1, $2, $3, now())
 		on conflict (user_id, client_id) do update
@@ -358,7 +372,45 @@ func (s *Server) StoreOAuthConsent(ctx context.Context, req *authv1.StoreOAuthCo
 		return nil, internal(err)
 	}
 
+	if changed {
+		_, err = tx.Exec(ctx, `insert into oauth_consent_history (user_id, client_id, scopes) values ($1, $2, $3)`, userID, clientID, req.Scopes)
+		if err != nil {
+			return nil, internal(err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, internal(err)
+	}
+
 	return &authv1.StoreOAuthConsentResponse{Success: true}, nil
+}
+
+func equalStringSets(a []string, b []string) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	seen := map[string]int{}
+	for _, s := range a {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		seen[s]++
+	}
+	for _, s := range b {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		seen[s]--
+	}
+	for _, v := range seen {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeRequest) (*authv1.OAuthAuthorizeResponse, error) {
