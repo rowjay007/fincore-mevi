@@ -1,0 +1,165 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "fx/v1/fx.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "FXService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/fx/convert": {
+      "post": {
+        "summary": "Convert an amount from one currency to another",
+        "operationId": "FXService_Convert",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ConvertResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ConvertRequest"
+            }
+          }
+        ],
+        "tags": [
+          "FXService"
+        ]
+      }
+    },
+    "/v1/fx/rate": {
+      "get": {
+        "summary": "Get current exchange rate for a currency pair",
+        "operationId": "FXService_GetRate",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetRateResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "baseCurrency",
+            "description": "e.g. \"USD\"",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "targetCurrency",
+            "description": "e.g. \"EUR\"",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "FXService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1ConvertRequest": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string",
+          "title": "Decimal string"
+        },
+        "fromCurrency": {
+          "type": "string"
+        },
+        "toCurrency": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ConvertResponse": {
+      "type": "object",
+      "properties": {
+        "convertedAmount": {
+          "type": "string"
+        },
+        "rate": {
+          "type": "string"
+        },
+        "convertedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "v1GetRateResponse": {
+      "type": "object",
+      "properties": {
+        "rate": {
+          "type": "string",
+          "title": "8-decimal precision string (e.g. \"0.92345678\")"
+        },
+        "fetchedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

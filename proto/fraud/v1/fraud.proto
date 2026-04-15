@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package fincore.fraud.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "fincore/gen/go/fraud/v1;fraudv1";
+
+service FraudService {
+  // Synchronously score a transaction for fraud risk
+  rpc ScoreTransaction(ScoreTransactionRequest) returns (ScoreTransactionResponse) {
+    option (google.api.http) = {
+      post: "/v1/fraud/score"
+      body: "*"
+    };
+  }
+}
+
+message ScoreTransactionRequest {
+  string transaction_id = 1;
+  string user_id = 2;
+  string amount = 3;         // Decimal string
+  string currency = 4;
+  string ip_address = 5;
+  string device_id = 6;
+  google.protobuf.Struct metadata = 7;
+}
+
+message ScoreTransactionResponse {
+  float score = 1;           // 0.0 to 1.0 (higher = riskier)
+  string decision = 2;       // "approve", "review", "reject"
+  repeated string reasons = 3;
+  google.protobuf.Timestamp scored_at = 4;
+}

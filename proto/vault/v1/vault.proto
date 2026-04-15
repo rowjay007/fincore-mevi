@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package fincore.vault.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "fincore/gen/go/vault/v1;vaultv1";
+
+service VaultService {
+  // Tokenize sensitive data (e.g. Card PAN) returning an opaque token
+  rpc Tokenize(TokenizeRequest) returns (TokenizeResponse) {
+    option (google.api.http) = {
+      post: "/v1/vault/tokenize"
+      body: "*"
+    };
+  }
+
+  // Detokenize an opaque token back to sensitive data (restricted access)
+  rpc Detokenize(DetokenizeRequest) returns (DetokenizeResponse) {
+    option (google.api.http) = {
+      post: "/v1/vault/detokenize"
+      body: "*"
+    };
+  }
+}
+
+message TokenizeRequest {
+  string data = 1;         // Sensitive string (e.g. 16-digit PAN)
+  string category = 2;     // e.g. "card_pan", "ssn"
+  string user_id = 3;
+}
+
+message TokenizeResponse {
+  string token = 1;        // UUID or opaque reference
+  google.protobuf.Timestamp created_at = 2;
+}
+
+message DetokenizeRequest {
+  string token = 1;
+  string reason = 2;       // Required for audit
+}
+
+message DetokenizeResponse {
+  string data = 1;
+}

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package fincore.fx.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "fincore/gen/go/fx/v1;fxv1";
+
+service FXService {
+  // Get current exchange rate for a currency pair
+  rpc GetRate(GetRateRequest) returns (GetRateResponse) {
+    option (google.api.http) = {
+      get: "/v1/fx/rate"
+    };
+  }
+
+  // Convert an amount from one currency to another
+  rpc Convert(ConvertRequest) returns (ConvertResponse) {
+    option (google.api.http) = {
+      post: "/v1/fx/convert"
+      body: "*"
+    };
+  }
+}
+
+message GetRateRequest {
+  string base_currency = 1;  // e.g. "USD"
+  string target_currency = 2; // e.g. "EUR"
+}
+
+message GetRateResponse {
+  string rate = 1;           // 8-decimal precision string (e.g. "0.92345678")
+  google.protobuf.Timestamp fetched_at = 2;
+}
+
+message ConvertRequest {
+  string amount = 1;         // Decimal string
+  string from_currency = 2;
+  string to_currency = 3;
+}
+
+message ConvertResponse {
+  string converted_amount = 1;
+  string rate = 2;
+  google.protobuf.Timestamp converted_at = 3;
+}
