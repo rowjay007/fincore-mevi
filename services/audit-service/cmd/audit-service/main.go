@@ -15,7 +15,9 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 type auditServer struct {
@@ -26,14 +28,29 @@ type auditServer struct {
 func (s *auditServer) ListAuditLogs(ctx context.Context, req *auditv1.ListAuditLogsRequest) (*auditv1.ListAuditLogsResponse, error) {
 	entries, err := s.repo.List(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to list audit logs: %v", err)
 	}
 	return &auditv1.ListAuditLogsResponse{Entries: entries}, nil
 }
 
 func (s *auditServer) GetAuditLog(ctx context.Context, req *auditv1.GetAuditLogRequest) (*auditv1.GetAuditLogResponse, error) {
-	// Simple implementation for now
-	return &auditv1.GetAuditLogResponse{}, nil
+	entry, err := s.repo.Get(ctx, req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "audit log not found: %v", err)
+	}
+	return &auditv1.GetAuditLogResponse{Entry: entry}, nil
+}
+
+func (s *auditServer) ValidateIntegrity(ctx context.Context, req *auditv1.ValidateIntegrityRequest) (*auditv1.ValidateIntegrityResponse, error) {
+	isValid, count, failingID, err := s.repo.ValidateIntegrity(ctx, req.StartId, req.EndId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to validate integrity: %v", err)
+	}
+	return &auditv1.ValidateIntegrityResponse{
+		IsValid:        isValid,
+		ProcessedCount: count,
+		FailingId:      failingID,
+	}, nil
 }
 
 func main() {

@@ -35,15 +35,7 @@ func (r *AuditRepository) Save(ctx context.Context, entry *auditv1.AuditLogEntry
 	}
 
 	// 2. Calculate the hash for the current entry
-	payloadBytes := []byte("{}")
-	if entry.Payload != nil {
-		payloadBytes, _ = json.Marshal(entry.Payload.AsMap())
-	}
-	dataToHash := fmt.Sprintf("%s|%s|%s|%s|%s|%s",
-		entry.UserId, entry.Action, entry.ResourceType, entry.ResourceId, string(payloadBytes), lastHash)
-
-	hash := sha256.Sum256([]byte(dataToHash))
-	currentHash := hex.EncodeToString(hash[:])
+	currentHash := r.CalculateHash(entry, lastHash)
 
 	// 3. Persist with the hash link
 	var payload interface{}
@@ -58,6 +50,69 @@ func (r *AuditRepository) Save(ctx context.Context, entry *auditv1.AuditLogEntry
 	`, entry.UserId, entry.Action, entry.ResourceType, entry.ResourceId, payload, entry.CorrelationId, entry.TraceId, entry.ServiceName, lastHash, currentHash)
 
 	return err
+}
+
+func (r *AuditRepository) CalculateHash(entry *auditv1.AuditLogEntry, previousHash string) string {
+	payloadBytes := []byte("{}")
+	if entry.Payload != nil {
+		payloadBytes, _ = json.Marshal(entry.Payload.AsMap())
+	}
+	dataToHash := fmt.Sprintf("%s|%s|%s|%s|%s|%s",
+		entry.UserId, entry.Action, entry.ResourceType, entry.ResourceId, string(payloadBytes), previousHash)
+
+	hash := sha256.Sum256([]byte(dataToHash))
+	return hex.EncodeToString(hash[:])
+}
+
+func (r *AuditRepository) ValidateIntegrity(ctx context.Context, startID, endID string) (bool, int32, string, error) {
+	// Mastery: Full cryptographic chain verification
+	rows, err := r.db.Query(ctx, `
+		select id, user_id, action, resource_type, resource_id, payload, correlation_id, trace_id, service_name, previous_hash, current_hash
+		from audit_logs
+		order by created_at asc
+	`)
+	if err != nil {
+		return false, 0, "", err
+	}
+	defer rows.Close()
+
+	var count int32
+	var expectedPrevHash string
+
+	for rows.Next() {
+		var e auditv1.AuditLogEntry
+		var payload map[string]interface{}
+		var prevHash, currHash string
+
+		err := rows.Scan(
+			&e.Id, &e.UserId, &e.Action, &e.ResourceType, &e.ResourceId, &payload,
+			&e.CorrelationId, &e.TraceId, &e.ServiceName, &prevHash, &currHash,
+		)
+		if err != nil {
+			return false, count, "", err
+		}
+
+		if payload != nil {
+			p, _ := structpb.NewStruct(payload)
+			e.Payload = p
+		}
+
+		// Verify chain link
+		if prevHash != expectedPrevHash {
+			return false, count, e.Id, nil
+		}
+
+		// Verify current hash
+		calculated := r.CalculateHash(&e, prevHash)
+		if calculated != currHash {
+			return false, count, e.Id, nil
+		}
+
+		expectedPrevHash = currHash
+		count++
+	}
+
+	return true, count, "", nil
 }
 
 func (r *AuditRepository) List(ctx context.Context, req *auditv1.ListAuditLogsRequest) ([]*auditv1.AuditLogEntry, error) {
@@ -104,4 +159,30 @@ func (r *AuditRepository) List(ctx context.Context, req *auditv1.ListAuditLogsRe
 		entries = append(entries, &e)
 	}
 	return entries, nil
+}
+
+func (r *AuditRepository) Get(ctx context.Context, id string) (*auditv1.AuditLogEntry, error) {
+	var e auditv1.AuditLogEntry
+	var payload map[string]interface{}
+	var createdAt time.Time
+
+	err := r.db.QueryRow(ctx, `
+		select id, user_id, action, resource_type, resource_id, payload, correlation_id, trace_id, service_name, created_at
+		from audit_logs
+		where id = $1
+	`, id).Scan(
+		&e.Id, &e.UserId, &e.Action, &e.ResourceType, &e.ResourceId, &payload, &e.CorrelationId, &e.TraceId, &e.ServiceName, &createdAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if payload != nil {
+		p, err := structpb.NewStruct(payload)
+		if err == nil {
+			e.Payload = p
+		}
+	}
+	e.Timestamp = timestamppb.New(createdAt)
+	return &e, nil
 }

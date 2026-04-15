@@ -356,6 +356,118 @@ func (x *GetAuditLogResponse) GetEntry() *AuditLogEntry {
 	return nil
 }
 
+type ValidateIntegrityRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StartId       string                 `protobuf:"bytes,1,opt,name=start_id,json=startId,proto3" json:"start_id,omitempty"`
+	EndId         string                 `protobuf:"bytes,2,opt,name=end_id,json=endId,proto3" json:"end_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateIntegrityRequest) Reset() {
+	*x = ValidateIntegrityRequest{}
+	mi := &file_audit_v1_audit_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateIntegrityRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateIntegrityRequest) ProtoMessage() {}
+
+func (x *ValidateIntegrityRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_audit_v1_audit_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateIntegrityRequest.ProtoReflect.Descriptor instead.
+func (*ValidateIntegrityRequest) Descriptor() ([]byte, []int) {
+	return file_audit_v1_audit_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ValidateIntegrityRequest) GetStartId() string {
+	if x != nil {
+		return x.StartId
+	}
+	return ""
+}
+
+func (x *ValidateIntegrityRequest) GetEndId() string {
+	if x != nil {
+		return x.EndId
+	}
+	return ""
+}
+
+type ValidateIntegrityResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	IsValid        bool                   `protobuf:"varint,1,opt,name=is_valid,json=isValid,proto3" json:"is_valid,omitempty"`
+	ProcessedCount int32                  `protobuf:"varint,2,opt,name=processed_count,json=processedCount,proto3" json:"processed_count,omitempty"`
+	FailingId      string                 `protobuf:"bytes,3,opt,name=failing_id,json=failingId,proto3" json:"failing_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ValidateIntegrityResponse) Reset() {
+	*x = ValidateIntegrityResponse{}
+	mi := &file_audit_v1_audit_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateIntegrityResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateIntegrityResponse) ProtoMessage() {}
+
+func (x *ValidateIntegrityResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_audit_v1_audit_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateIntegrityResponse.ProtoReflect.Descriptor instead.
+func (*ValidateIntegrityResponse) Descriptor() ([]byte, []int) {
+	return file_audit_v1_audit_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ValidateIntegrityResponse) GetIsValid() bool {
+	if x != nil {
+		return x.IsValid
+	}
+	return false
+}
+
+func (x *ValidateIntegrityResponse) GetProcessedCount() int32 {
+	if x != nil {
+		return x.ProcessedCount
+	}
+	return 0
+}
+
+func (x *ValidateIntegrityResponse) GetFailingId() string {
+	if x != nil {
+		return x.FailingId
+	}
+	return ""
+}
+
 var File_audit_v1_audit_proto protoreflect.FileDescriptor
 
 const file_audit_v1_audit_proto_rawDesc = "" +
@@ -388,10 +500,19 @@ const file_audit_v1_audit_proto_rawDesc = "" +
 	"\x12GetAuditLogRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"L\n" +
 	"\x13GetAuditLogResponse\x125\n" +
-	"\x05entry\x18\x01 \x01(\v2\x1f.fincore.audit.v1.AuditLogEntryR\x05entry2\x81\x02\n" +
+	"\x05entry\x18\x01 \x01(\v2\x1f.fincore.audit.v1.AuditLogEntryR\x05entry\"L\n" +
+	"\x18ValidateIntegrityRequest\x12\x19\n" +
+	"\bstart_id\x18\x01 \x01(\tR\astartId\x12\x15\n" +
+	"\x06end_id\x18\x02 \x01(\tR\x05endId\"~\n" +
+	"\x19ValidateIntegrityResponse\x12\x19\n" +
+	"\bis_valid\x18\x01 \x01(\bR\aisValid\x12'\n" +
+	"\x0fprocessed_count\x18\x02 \x01(\x05R\x0eprocessedCount\x12\x1d\n" +
+	"\n" +
+	"failing_id\x18\x03 \x01(\tR\tfailingId2\x99\x03\n" +
 	"\fAuditService\x12x\n" +
 	"\rListAuditLogs\x12&.fincore.audit.v1.ListAuditLogsRequest\x1a'.fincore.audit.v1.ListAuditLogsResponse\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/audit/logs\x12w\n" +
-	"\vGetAuditLog\x12$.fincore.audit.v1.GetAuditLogRequest\x1a%.fincore.audit.v1.GetAuditLogResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/audit/logs/{id}B!Z\x1ffincore/gen/go/audit/v1;auditv1b\x06proto3"
+	"\vGetAuditLog\x12$.fincore.audit.v1.GetAuditLogRequest\x1a%.fincore.audit.v1.GetAuditLogResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/v1/audit/logs/{id}\x12\x95\x01\n" +
+	"\x11ValidateIntegrity\x12*.fincore.audit.v1.ValidateIntegrityRequest\x1a+.fincore.audit.v1.ValidateIntegrityResponse\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/v1/audit/validate-integrityB!Z\x1ffincore/gen/go/audit/v1;auditv1b\x06proto3"
 
 var (
 	file_audit_v1_audit_proto_rawDescOnce sync.Once
@@ -405,27 +526,31 @@ func file_audit_v1_audit_proto_rawDescGZIP() []byte {
 	return file_audit_v1_audit_proto_rawDescData
 }
 
-var file_audit_v1_audit_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_audit_v1_audit_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_audit_v1_audit_proto_goTypes = []any{
-	(*AuditLogEntry)(nil),         // 0: fincore.audit.v1.AuditLogEntry
-	(*ListAuditLogsRequest)(nil),  // 1: fincore.audit.v1.ListAuditLogsRequest
-	(*ListAuditLogsResponse)(nil), // 2: fincore.audit.v1.ListAuditLogsResponse
-	(*GetAuditLogRequest)(nil),    // 3: fincore.audit.v1.GetAuditLogRequest
-	(*GetAuditLogResponse)(nil),   // 4: fincore.audit.v1.GetAuditLogResponse
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),       // 6: google.protobuf.Struct
+	(*AuditLogEntry)(nil),             // 0: fincore.audit.v1.AuditLogEntry
+	(*ListAuditLogsRequest)(nil),      // 1: fincore.audit.v1.ListAuditLogsRequest
+	(*ListAuditLogsResponse)(nil),     // 2: fincore.audit.v1.ListAuditLogsResponse
+	(*GetAuditLogRequest)(nil),        // 3: fincore.audit.v1.GetAuditLogRequest
+	(*GetAuditLogResponse)(nil),       // 4: fincore.audit.v1.GetAuditLogResponse
+	(*ValidateIntegrityRequest)(nil),  // 5: fincore.audit.v1.ValidateIntegrityRequest
+	(*ValidateIntegrityResponse)(nil), // 6: fincore.audit.v1.ValidateIntegrityResponse
+	(*timestamppb.Timestamp)(nil),     // 7: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),           // 8: google.protobuf.Struct
 }
 var file_audit_v1_audit_proto_depIdxs = []int32{
-	5, // 0: fincore.audit.v1.AuditLogEntry.timestamp:type_name -> google.protobuf.Timestamp
-	6, // 1: fincore.audit.v1.AuditLogEntry.payload:type_name -> google.protobuf.Struct
+	7, // 0: fincore.audit.v1.AuditLogEntry.timestamp:type_name -> google.protobuf.Timestamp
+	8, // 1: fincore.audit.v1.AuditLogEntry.payload:type_name -> google.protobuf.Struct
 	0, // 2: fincore.audit.v1.ListAuditLogsResponse.entries:type_name -> fincore.audit.v1.AuditLogEntry
 	0, // 3: fincore.audit.v1.GetAuditLogResponse.entry:type_name -> fincore.audit.v1.AuditLogEntry
 	1, // 4: fincore.audit.v1.AuditService.ListAuditLogs:input_type -> fincore.audit.v1.ListAuditLogsRequest
 	3, // 5: fincore.audit.v1.AuditService.GetAuditLog:input_type -> fincore.audit.v1.GetAuditLogRequest
-	2, // 6: fincore.audit.v1.AuditService.ListAuditLogs:output_type -> fincore.audit.v1.ListAuditLogsResponse
-	4, // 7: fincore.audit.v1.AuditService.GetAuditLog:output_type -> fincore.audit.v1.GetAuditLogResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
+	5, // 6: fincore.audit.v1.AuditService.ValidateIntegrity:input_type -> fincore.audit.v1.ValidateIntegrityRequest
+	2, // 7: fincore.audit.v1.AuditService.ListAuditLogs:output_type -> fincore.audit.v1.ListAuditLogsResponse
+	4, // 8: fincore.audit.v1.AuditService.GetAuditLog:output_type -> fincore.audit.v1.GetAuditLogResponse
+	6, // 9: fincore.audit.v1.AuditService.ValidateIntegrity:output_type -> fincore.audit.v1.ValidateIntegrityResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
 	4, // [4:4] is the sub-list for extension extendee
 	0, // [0:4] is the sub-list for field type_name
@@ -442,7 +567,7 @@ func file_audit_v1_audit_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_audit_v1_audit_proto_rawDesc), len(file_audit_v1_audit_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

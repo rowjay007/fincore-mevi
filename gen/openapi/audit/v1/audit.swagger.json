@@ -100,6 +100,39 @@
           "AuditService"
         ]
       }
+    },
+    "/v1/audit/validate-integrity": {
+      "post": {
+        "summary": "Validate the integrity of the audit log (Merkle Chain check)",
+        "operationId": "AuditService_ValidateIntegrity",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ValidateIntegrityResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ValidateIntegrityRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuditService"
+        ]
+      }
     }
   },
   "definitions": {
@@ -194,6 +227,32 @@
           }
         },
         "nextPageToken": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ValidateIntegrityRequest": {
+      "type": "object",
+      "properties": {
+        "startId": {
+          "type": "string"
+        },
+        "endId": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ValidateIntegrityResponse": {
+      "type": "object",
+      "properties": {
+        "isValid": {
+          "type": "boolean"
+        },
+        "processedCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "failingId": {
           "type": "string"
         }
       }

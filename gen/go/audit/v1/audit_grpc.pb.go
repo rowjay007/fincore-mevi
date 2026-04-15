@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuditService_ListAuditLogs_FullMethodName = "/fincore.audit.v1.AuditService/ListAuditLogs"
-	AuditService_GetAuditLog_FullMethodName   = "/fincore.audit.v1.AuditService/GetAuditLog"
+	AuditService_ListAuditLogs_FullMethodName     = "/fincore.audit.v1.AuditService/ListAuditLogs"
+	AuditService_GetAuditLog_FullMethodName       = "/fincore.audit.v1.AuditService/GetAuditLog"
+	AuditService_ValidateIntegrity_FullMethodName = "/fincore.audit.v1.AuditService/ValidateIntegrity"
 )
 
 // AuditServiceClient is the client API for AuditService service.
@@ -29,6 +30,8 @@ const (
 type AuditServiceClient interface {
 	ListAuditLogs(ctx context.Context, in *ListAuditLogsRequest, opts ...grpc.CallOption) (*ListAuditLogsResponse, error)
 	GetAuditLog(ctx context.Context, in *GetAuditLogRequest, opts ...grpc.CallOption) (*GetAuditLogResponse, error)
+	// Validate the integrity of the audit log (Merkle Chain check)
+	ValidateIntegrity(ctx context.Context, in *ValidateIntegrityRequest, opts ...grpc.CallOption) (*ValidateIntegrityResponse, error)
 }
 
 type auditServiceClient struct {
@@ -59,12 +62,24 @@ func (c *auditServiceClient) GetAuditLog(ctx context.Context, in *GetAuditLogReq
 	return out, nil
 }
 
+func (c *auditServiceClient) ValidateIntegrity(ctx context.Context, in *ValidateIntegrityRequest, opts ...grpc.CallOption) (*ValidateIntegrityResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateIntegrityResponse)
+	err := c.cc.Invoke(ctx, AuditService_ValidateIntegrity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuditServiceServer is the server API for AuditService service.
 // All implementations must embed UnimplementedAuditServiceServer
 // for forward compatibility.
 type AuditServiceServer interface {
 	ListAuditLogs(context.Context, *ListAuditLogsRequest) (*ListAuditLogsResponse, error)
 	GetAuditLog(context.Context, *GetAuditLogRequest) (*GetAuditLogResponse, error)
+	// Validate the integrity of the audit log (Merkle Chain check)
+	ValidateIntegrity(context.Context, *ValidateIntegrityRequest) (*ValidateIntegrityResponse, error)
 	mustEmbedUnimplementedAuditServiceServer()
 }
 
@@ -80,6 +95,9 @@ func (UnimplementedAuditServiceServer) ListAuditLogs(context.Context, *ListAudit
 }
 func (UnimplementedAuditServiceServer) GetAuditLog(context.Context, *GetAuditLogRequest) (*GetAuditLogResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAuditLog not implemented")
+}
+func (UnimplementedAuditServiceServer) ValidateIntegrity(context.Context, *ValidateIntegrityRequest) (*ValidateIntegrityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ValidateIntegrity not implemented")
 }
 func (UnimplementedAuditServiceServer) mustEmbedUnimplementedAuditServiceServer() {}
 func (UnimplementedAuditServiceServer) testEmbeddedByValue()                      {}
@@ -138,6 +156,24 @@ func _AuditService_GetAuditLog_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuditService_ValidateIntegrity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateIntegrityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuditServiceServer).ValidateIntegrity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuditService_ValidateIntegrity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuditServiceServer).ValidateIntegrity(ctx, req.(*ValidateIntegrityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuditService_ServiceDesc is the grpc.ServiceDesc for AuditService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +188,10 @@ var AuditService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAuditLog",
 			Handler:    _AuditService_GetAuditLog_Handler,
+		},
+		{
+			MethodName: "ValidateIntegrity",
+			Handler:    _AuditService_ValidateIntegrity_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

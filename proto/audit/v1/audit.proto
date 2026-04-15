@@ -20,6 +20,14 @@ service AuditService {
       get: "/v1/audit/logs/{id}"
     };
   }
+
+  // Validate the integrity of the audit log (Merkle Chain check)
+  rpc ValidateIntegrity(ValidateIntegrityRequest) returns (ValidateIntegrityResponse) {
+    option (google.api.http) = {
+      post: "/v1/audit/validate-integrity"
+      body: "*"
+    };
+  }
 }
 
 message AuditLogEntry {
@@ -54,4 +62,15 @@ message GetAuditLogRequest {
 
 message GetAuditLogResponse {
   AuditLogEntry entry = 1;
+}
+
+message ValidateIntegrityRequest {
+  string start_id = 1;
+  string end_id = 2;
+}
+
+message ValidateIntegrityResponse {
+  bool is_valid = 1;
+  int32 processed_count = 2;
+  string failing_id = 3;
 }
