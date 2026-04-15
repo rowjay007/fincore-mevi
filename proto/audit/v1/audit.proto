@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package fincore.audit.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "fincore/gen/go/audit/v1;auditv1";
+
+service AuditService {
+  rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse) {
+    option (google.api.http) = {
+      get: "/v1/audit/logs"
+    };
+  }
+
+  rpc GetAuditLog(GetAuditLogRequest) returns (GetAuditLogResponse) {
+    option (google.api.http) = {
+      get: "/v1/audit/logs/{id}"
+    };
+  }
+}
+
+message AuditLogEntry {
+  string id = 1;
+  string user_id = 2;
+  string action = 3;
+  string resource_type = 4;
+  string resource_id = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  google.protobuf.Struct payload = 7;
+  string correlation_id = 8;
+  string trace_id = 9;
+  string service_name = 10;
+}
+
+message ListAuditLogsRequest {
+  string user_id = 1;
+  string resource_type = 2;
+  string resource_id = 3;
+  int32 limit = 4;
+  string page_token = 5;
+}
+
+message ListAuditLogsResponse {
+  repeated AuditLogEntry entries = 1;
+  string next_page_token = 2;
+}
+
+message GetAuditLogRequest {
+  string id = 1;
+}
+
+message GetAuditLogResponse {
+  AuditLogEntry entry = 1;
+}

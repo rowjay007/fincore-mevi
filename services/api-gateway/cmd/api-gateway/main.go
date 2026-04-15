@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -242,6 +243,13 @@ func main() {
 		identityHTTP = ":8084"
 	}
 
+	shutdown, err := security.InitTracer(ctx, "api-gateway")
+	if err != nil {
+		log.Printf("failed to initialize tracer: %v", err)
+	} else {
+		defer shutdown(ctx)
+	}
+
 	mux := runtime.NewServeMux(gatewayHeaderForwarder())
 	creds, closeSrc := spiffeDialCreds(ctx)
 	defer closeSrc()
@@ -295,6 +303,7 @@ func main() {
 	h = stripUntrustedIdentityHeaders(h)
 	h = withJWTAuth(verifier, publicPrefixes, h)
 	h = withRateLimitByPath(lim, strict, strictPrefixes, h)
+	h = otelhttp.NewHandler(h, "gateway-request")
 
 	root := http.NewServeMux()
 	root.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {

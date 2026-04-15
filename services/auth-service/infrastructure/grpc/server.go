@@ -18,12 +18,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var tracer = otel.Tracer("auth-service")
 
 func invalidArg(msg string) error  { return status.Error(codes.InvalidArgument, msg) }
 func unauth(msg string) error      { return status.Error(codes.Unauthenticated, msg) }
@@ -561,6 +566,12 @@ func (s *Server) OAuthAuthorize(ctx context.Context, req *authv1.OAuthAuthorizeR
 }
 
 func (s *Server) OAuthToken(ctx context.Context, req *authv1.OAuthTokenRequest) (*authv1.OAuthTokenResponse, error) {
+	ctx, span := tracer.Start(ctx, "OAuthToken", trace.WithAttributes(
+		attribute.String("oauth2.grant_type", req.GrantType),
+		attribute.String("oauth2.client_id", req.ClientId),
+	))
+	defer span.End()
+
 	if strings.TrimSpace(req.GrantType) != "authorization_code" {
 		return nil, invalidArg("unsupported grant_type")
 	}

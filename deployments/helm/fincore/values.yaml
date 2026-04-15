@@ -1,0 +1,29 @@
+services:
+  - name: account-service
+    port: 50051
+  - name: ledger-service
+    port: 50053
+  - name: auth-service
+    port: 50056
+  - name: identity-service
+    port: 8084
+  - name: payment-service
+    port: 50057
+  - name: audit-service
+    port: 50058
+  - name: api-gateway
+    port: 8080
+
+image:
+  repository: fincore
+  tag: latest
+  pullPolicy: IfNotPresent
+
+postgresql:
+  dsn: "postgres://postgres:postgres@postgres:5432/fincore?sslmode=disable"
+
+nats:
+  url: "nats://nats:4222"
+
+otel:
+  endpoint: "otel-collector:4317"

@@ -1,0 +1,16 @@
+# Build stage
+FROM golang:1.25-alpine AS builder
+ARG SERVICE_NAME
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/service ./services/${SERVICE_NAME}/cmd/${SERVICE_NAME}/main.go
+
+# Run stage
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /app
+COPY --from=builder /app/service .
+EXPOSE 8080 50051
+CMD ["./service"]
