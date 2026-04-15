@@ -10,43 +10,43 @@ import (
 
 	vaultv1 "fincore/gen/go/vault/v1"
 	"fincore/pkg/security"
+	"fincore/services/vault-service/domain"
 	"fincore/services/vault-service/infrastructure/vault"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type vaultServer struct {
 	vaultv1.UnimplementedVaultServiceServer
-	vault *vault.Client
+	vault domain.VaultPort
 }
 
 func (s *vaultServer) Tokenize(ctx context.Context, req *vaultv1.TokenizeRequest) (*vaultv1.TokenizeResponse, error) {
-	// In production, we'd use Format-Preserving Encryption (FPE) via Vault Transit
-	// For this skeleton, we use standard Transit encryption path
-	// The path corresponds to the 'category' (e.g., card_pan)
-	ciphertext, err := s.vault.Encrypt(ctx, req.Category, req.Data)
+	token, err := s.vault.Tokenize(ctx, req.Category, req.Data)
 	if err != nil {
-		log.Printf("vault encrypt error: %v", err)
-		return nil, err
+		log.Printf("vault tokenize error: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to tokenize: %v", err)
 	}
 
 	return &vaultv1.TokenizeResponse{
-		Token:     ciphertext,
+		Token:     token,
 		CreatedAt: timestamppb.Now(),
 	}, nil
 }
 
 func (s *vaultServer) Detokenize(ctx context.Context, req *vaultv1.DetokenizeRequest) (*vaultv1.DetokenizeResponse, error) {
-	// Security: Log detokenization reasons for PCI-DSS/SOC2 audit
-	log.Printf("AUDIT: Detokenize request for token %s, reason: %s", req.Token, req.Reason)
+	if req.Reason == "" {
+		return nil, status.Error(codes.InvalidArgument, "detokenize reason is required for audit")
+	}
 
-	// Determine category from token prefix if needed, or require it in request.
-	// Vault ciphertext usually starts with 'vault:v1:...'
-	plaintext, err := s.vault.Decrypt(ctx, "card_pan", req.Token)
+	plaintext, err := s.vault.Detokenize(ctx, req.Token, req.Reason)
 	if err != nil {
-		return nil, err
+		log.Printf("vault detokenize error: %v", err)
+		return nil, status.Errorf(codes.PermissionDenied, "failed to detokenize")
 	}
 
 	return &vaultv1.DetokenizeResponse{

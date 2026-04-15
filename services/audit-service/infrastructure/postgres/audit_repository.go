@@ -2,9 +2,16 @@ package postgres
 
 import (
 	"context"
-	auditv1 "fincore/gen/go/audit/v1"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"log"
 	"time"
 
+	auditv1 "fincore/gen/go/audit/v1"
+
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -19,16 +26,37 @@ func NewAuditRepository(db *pgxpool.Pool) *AuditRepository {
 }
 
 func (r *AuditRepository) Save(ctx context.Context, entry *auditv1.AuditLogEntry) error {
+	// 1. Fetch the hash of the latest entry to create the Merkle Chain
+	var lastHash string
+	err := r.db.QueryRow(ctx, "select current_hash from audit_logs order by created_at desc limit 1").Scan(&lastHash)
+	if err != nil && err != pgx.ErrNoRows {
+		// Only log real errors; empty result is expected for first entry
+		log.Printf("failed to fetch last hash: %v", err)
+	}
+
+	// 2. Calculate the hash for the current entry
+	payloadBytes := []byte("{}")
+	if entry.Payload != nil {
+		payloadBytes, _ = json.Marshal(entry.Payload.AsMap())
+	}
+	dataToHash := fmt.Sprintf("%s|%s|%s|%s|%s|%s",
+		entry.UserId, entry.Action, entry.ResourceType, entry.ResourceId, string(payloadBytes), lastHash)
+
+	hash := sha256.Sum256([]byte(dataToHash))
+	currentHash := hex.EncodeToString(hash[:])
+
+	// 3. Persist with the hash link
 	var payload interface{}
 	if entry.Payload != nil {
 		payload = entry.Payload.AsMap()
 	}
 
-	_, err := r.db.Exec(ctx, `
+	_, err = r.db.Exec(ctx, `
 		insert into audit_logs (
-			user_id, action, resource_type, resource_id, payload, correlation_id, trace_id, service_name
-		) values ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, entry.UserId, entry.Action, entry.ResourceType, entry.ResourceId, payload, entry.CorrelationId, entry.TraceId, entry.ServiceName)
+			user_id, action, resource_type, resource_id, payload, correlation_id, trace_id, service_name, previous_hash, current_hash
+		) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, entry.UserId, entry.Action, entry.ResourceType, entry.ResourceId, payload, entry.CorrelationId, entry.TraceId, entry.ServiceName, lastHash, currentHash)
+
 	return err
 }
 

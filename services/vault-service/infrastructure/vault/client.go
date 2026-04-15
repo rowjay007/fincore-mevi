@@ -3,6 +3,9 @@ package vault
 import (
 	"context"
 	"fmt"
+	"log"
+
+	"fincore/services/vault-service/domain"
 
 	"github.com/hashicorp/vault/api"
 )
@@ -22,9 +25,9 @@ func NewClient(address, token string) (*Client, error) {
 	return &Client{client: client}, nil
 }
 
-func (c *Client) Encrypt(ctx context.Context, path string, data string) (string, error) {
+func (c *Client) Tokenize(ctx context.Context, category string, data string) (string, error) {
 	// Uses Vault Transit Secret Engine for FPE/Tokenization
-	secret, err := c.client.Logical().WriteWithContext(ctx, fmt.Sprintf("transit/encrypt/%s", path), map[string]interface{}{
+	secret, err := c.client.Logical().WriteWithContext(ctx, fmt.Sprintf("transit/encrypt/%s", category), map[string]interface{}{
 		"plaintext": data, // In real prod, this should be base64 encoded
 	})
 	if err != nil {
@@ -37,9 +40,12 @@ func (c *Client) Encrypt(ctx context.Context, path string, data string) (string,
 	return ciphertext, nil
 }
 
-func (c *Client) Decrypt(ctx context.Context, path string, ciphertext string) (string, error) {
-	secret, err := c.client.Logical().WriteWithContext(ctx, fmt.Sprintf("transit/decrypt/%s", path), map[string]interface{}{
-		"ciphertext": ciphertext,
+func (c *Client) Detokenize(ctx context.Context, token string, reason string) (string, error) {
+	// Security: Log detokenization for PCI-DSS/SOC2 compliance.
+	log.Printf("AUDIT: Detokenize request for token %s, reason: %s", token, reason)
+
+	secret, err := c.client.Logical().WriteWithContext(ctx, "transit/decrypt/card_pan", map[string]interface{}{
+		"ciphertext": token,
 	})
 	if err != nil {
 		return "", err
@@ -50,3 +56,6 @@ func (c *Client) Decrypt(ctx context.Context, path string, ciphertext string) (s
 	}
 	return plaintext, nil
 }
+
+// Ensure Client implements domain.VaultPort
+var _ domain.VaultPort = (*Client)(nil)

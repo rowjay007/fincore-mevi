@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"math/big"
 	"net"
 	"os"
 	"os/signal"
@@ -10,35 +11,56 @@ import (
 
 	fraudv1 "fincore/gen/go/fraud/v1"
 	"fincore/pkg/security"
+	"fincore/services/fraud-engine/domain"
+	"fincore/services/fraud-engine/infrastructure/rules"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type fraudServer struct {
 	fraudv1.UnimplementedFraudServiceServer
+	evaluator domain.Evaluator
 }
 
 func (s *fraudServer) ScoreTransaction(ctx context.Context, req *fraudv1.ScoreTransactionRequest) (*fraudv1.ScoreTransactionResponse, error) {
-	// In production, this would use ONNX runtime or a rules engine.
-	// We'll simulate a deterministic but simplistic rule: amounts > 10k are riskier.
-	// For this skeleton, we use a sample score.
-	score := float32(0.05)
-	decision := "approve"
-	var reasons []string
-
-	// Simple heuristic simulation
-	if req.Amount != "" && len(req.Amount) > 4 {
-		score = 0.85
-		decision = "review"
-		reasons = append(reasons, "large_amount_threshold_exceeded")
+	amount, ok := new(big.Float).SetPrec(256).SetString(req.Amount)
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "invalid amount format")
 	}
 
+	isNewDevice := false
+	if req.Metadata != nil {
+		fields := req.Metadata.GetFields()
+		if val, ok := fields["is_new_device"]; ok {
+			isNewDevice = val.GetBoolValue()
+		}
+	}
+
+	txn := &domain.Transaction{
+		ID:          req.TransactionId,
+		UserID:      req.UserId,
+		Amount:      amount,
+		Currency:    req.Currency,
+		DeviceID:    req.DeviceId,
+		IPAddress:   req.IpAddress,
+		IsNewDevice: isNewDevice,
+	}
+
+	res, err := s.evaluator.Evaluate(ctx, txn)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "fraud evaluation failed: %v", err)
+	}
+
+	log.Printf("FRAUD_SCORE: txn=%s user=%s score=%.2f decision=%s", req.TransactionId, req.UserId, res.Score, res.Decision)
+
 	return &fraudv1.ScoreTransactionResponse{
-		Score:    score,
-		Decision: decision,
-		Reasons:  reasons,
+		Score:    res.Score,
+		Decision: res.Decision,
+		Reasons:  res.Reasons,
 		ScoredAt: timestamppb.Now(),
 	}, nil
 }
@@ -55,6 +77,8 @@ func main() {
 		defer shutdown(ctx)
 	}
 
+	evaluator := rules.NewHeuristicEvaluator()
+
 	listenAddr := os.Getenv("LISTEN_ADDR")
 	if listenAddr == "" {
 		listenAddr = ":50061"
@@ -66,7 +90,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	fraudv1.RegisterFraudServiceServer(s, &fraudServer{})
+	fraudv1.RegisterFraudServiceServer(s, &fraudServer{evaluator: evaluator})
 	reflection.Register(s)
 
 	log.Printf("fraud-engine (ML Scoring) listening on %s", listenAddr)

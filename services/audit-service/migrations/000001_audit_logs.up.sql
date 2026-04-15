@@ -8,6 +8,8 @@ create table if not exists audit_logs (
   correlation_id text,
   trace_id text,
   service_name text,
+  previous_hash text,
+  current_hash text,
   created_at timestamptz not null default now()
 );
 
@@ -15,3 +17,4 @@ create index if not exists audit_logs_user_idx on audit_logs(user_id);
 create index if not exists audit_logs_resource_idx on audit_logs(resource_type, resource_id);
 create index if not exists audit_logs_created_at_idx on audit_logs(created_at desc);
 create index if not exists audit_logs_correlation_id_idx on audit_logs(correlation_id);
+create index if not exists audit_logs_hash_idx on audit_logs(current_hash);
