@@ -20,7 +20,7 @@ RUN test -n "$SERVICE_PKG" && test -n "$BIN_NAME"
 RUN go build -trimpath -ldflags "-s -w" -o "/out/${BIN_NAME}" "${SERVICE_PKG}"
 
 
-FROM alpine:3.20
+FROM alpine:3.23
 
 RUN apk add --no-cache ca-certificates
 
