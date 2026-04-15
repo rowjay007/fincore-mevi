@@ -265,11 +265,12 @@ func (s *Server) GetOAuthClient(ctx context.Context, req *authv1.GetOAuthClientR
 	return &authv1.GetOAuthClientResponse{Client: &authv1.OAuthClient{ClientId: rec.ID, Name: rec.Name, Type: rec.Type, RedirectUris: rec.RedirectURIs, AllowedScopes: rec.AllowedScopes}}, nil
 }
 
-func (s *Server) ListOAuthClients(ctx context.Context, _ *authv1.ListOAuthClientsRequest) (*authv1.ListOAuthClientsResponse, error) {
+func (s *Server) ListOAuthClients(ctx context.Context, req *authv1.ListOAuthClientsRequest) (*authv1.ListOAuthClientsResponse, error) {
 	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `select id, name, type, redirect_uris, allowed_scopes from oauth_clients order by created_at desc`)
+	limit := int32(50)
+	rows, err := s.db.Query(ctx, `select id, name, type, redirect_uris, allowed_scopes from oauth_clients order by created_at desc limit $1`, limit)
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -313,26 +314,25 @@ func (s *Server) RotateOAuthClientSecret(ctx context.Context, req *authv1.Rotate
 	if err := s.requirePermissionFromAuthHeader(ctx, "auth:admin"); err != nil {
 		return nil, err
 	}
-	rec, err := s.fetchOAuthClient(ctx, req.ClientId)
+	clientID := strings.TrimSpace(req.ClientId)
+	if clientID == "" {
+		return nil, invalidArg("client_id required")
+	}
+
+	newSecret, err := security.GenerateSecret(32)
 	if err != nil {
-		return nil, err
+		return nil, internal(fmt.Errorf("failed to generate secret: %w", err))
 	}
-	if rec.Type != "confidential" {
-		return nil, invalidArg("client is not confidential")
-	}
-	secret, err := randomB64URL(32)
-	if err != nil {
-		return nil, internal(err)
-	}
-	h, err := security.HashPassword(secret)
-	if err != nil {
-		return nil, internal(err)
-	}
-	_, err = s.db.Exec(ctx, `update oauth_clients set secret_hash = $2 where id = $1`, rec.ID, h)
+
+	res, err := s.db.Exec(ctx, "update oauth_clients set secret = $1 where id = $2", newSecret, clientID)
 	if err != nil {
 		return nil, internal(err)
 	}
-	return &authv1.RotateOAuthClientSecretResponse{ClientSecret: secret}, nil
+	if res.RowsAffected() == 0 {
+		return nil, notFound("unknown client")
+	}
+
+	return &authv1.RotateOAuthClientSecretResponse{ClientSecret: newSecret}, nil
 }
 
 func (s *Server) GetOAuthConsent(ctx context.Context, req *authv1.GetOAuthConsentRequest) (*authv1.GetOAuthConsentResponse, error) {

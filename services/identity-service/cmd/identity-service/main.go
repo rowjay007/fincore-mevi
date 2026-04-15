@@ -365,7 +365,24 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 		if err == nil {
 			store.del(r.Context(), c.Value)
 		}
-		http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil})
+		http.SetCookie(w, &http.Cookie{
+			Name:     sessionCookieName,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   r.TLS != nil,
+		})
+		http.SetCookie(w, &http.Cookie{
+			Name:     csrfCookieName,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Secure:   r.TLS != nil,
+		})
 		w.WriteHeader(http.StatusNoContent)
 	})
 	h.HandleFunc("/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
@@ -401,7 +418,14 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 			v, err := randomB64URL(32)
 			if err == nil {
 				csrfCookieVal = v
-				http.SetCookie(w, &http.Cookie{Name: csrfCookieName, Value: csrfCookieVal, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil})
+				http.SetCookie(w, &http.Cookie{
+					Name:     csrfCookieName,
+					Value:    csrfCookieVal,
+					Path:     "/",
+					HttpOnly: true,
+					SameSite: http.SameSiteLaxMode,
+					Secure:   r.TLS != nil,
+				})
 			}
 		}
 		data.CSRFToken = csrfCookieVal
