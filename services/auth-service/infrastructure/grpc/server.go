@@ -190,6 +190,7 @@ func (s *Server) CreateOAuthClient(ctx context.Context, req *authv1.CreateOAuthC
 		return nil, invalidArg("redirect_uris required")
 	}
 	redirects := make([]string, 0, len(req.RedirectUris))
+	seenRedirects := map[string]struct{}{}
 	for _, r := range req.RedirectUris {
 		r = strings.TrimSpace(r)
 		if r == "" {
@@ -199,6 +200,13 @@ func (s *Server) CreateOAuthClient(ctx context.Context, req *authv1.CreateOAuthC
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			return nil, invalidArg("invalid redirect_uri")
 		}
+		if strings.TrimSpace(u.Fragment) != "" {
+			return nil, invalidArg("redirect_uri must not contain fragment")
+		}
+		if _, ok := seenRedirects[r]; ok {
+			continue
+		}
+		seenRedirects[r] = struct{}{}
 		redirects = append(redirects, r)
 	}
 	if len(redirects) == 0 {
@@ -291,9 +299,12 @@ func (s *Server) DeleteOAuthClient(ctx context.Context, req *authv1.DeleteOAuthC
 	if clientID == "" {
 		return nil, invalidArg("client_id required")
 	}
-	_, err := s.db.Exec(ctx, `delete from oauth_clients where id = $1`, clientID)
+	res, err := s.db.Exec(ctx, `delete from oauth_clients where id = $1`, clientID)
 	if err != nil {
 		return nil, internal(err)
+	}
+	if res.RowsAffected() == 0 {
+		return nil, notFound("unknown client")
 	}
 	return &authv1.DeleteOAuthClientResponse{Success: true}, nil
 }

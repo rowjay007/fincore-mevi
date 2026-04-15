@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -75,6 +76,84 @@ func TestOAuthToken_ConfidentialClient_BasicAuthOK(t *testing.T) {
 	}
 	if res.AccessToken == "" || res.RefreshToken == "" {
 		t.Fatalf("expected tokens")
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestCreateOAuthClient_RejectsRedirectURIFragment(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthAdminTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer access"))
+	_, err = s.CreateOAuthClient(ctx, &authv1.CreateOAuthClientRequest{Name: "client", Type: "public", RedirectUris: []string{"https://app.example/cb#frag"}})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if st, ok := status.FromError(err); ok {
+		if st.Code() != codes.InvalidArgument {
+			t.Fatalf("expected invalid argument, got %v", st.Code())
+		}
+	}
+}
+
+func TestCreateOAuthClient_DedupesRedirectURIs(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthAdminTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	// Expect only one redirect URI to be persisted.
+	db.ExpectExec("insert into oauth_clients").WithArgs(pgxmock.AnyArg(), "client", "public", nil, []string{"https://app.example/cb"}, []string{}).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer access"))
+	res, err := s.CreateOAuthClient(ctx, &authv1.CreateOAuthClientRequest{Name: "client", Type: "public", RedirectUris: []string{"https://app.example/cb", "https://app.example/cb"}})
+	if err != nil {
+		t.Fatalf("CreateOAuthClient: %v", err)
+	}
+	if res == nil || res.Client == nil {
+		t.Fatalf("expected client")
+	}
+	if len(res.Client.RedirectUris) != 1 || res.Client.RedirectUris[0] != "https://app.example/cb" {
+		t.Fatalf("expected deduped redirect uris, got %+v", res.Client.RedirectUris)
+	}
+
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestDeleteOAuthClient_UnknownClientReturnsNotFound(t *testing.T) {
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock: %v", err)
+	}
+	defer db.Close()
+
+	s := NewServer(db, oauthAdminTokenMaker{}, 15*time.Minute, 30*24*time.Hour)
+
+	db.ExpectExec("delete from oauth_clients").WithArgs("c-unknown").WillReturnResult(pgxmock.NewResult("DELETE", 0))
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer access"))
+	_, err = s.DeleteOAuthClient(ctx, &authv1.DeleteOAuthClientRequest{ClientId: "c-unknown"})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if st, ok := status.FromError(err); ok {
+		if st.Code() != codes.NotFound {
+			t.Fatalf("expected not found, got %v", st.Code())
+		}
 	}
 
 	if err := db.ExpectationsWereMet(); err != nil {
