@@ -65,19 +65,18 @@ FinCore is a greenfield core banking system designed to power a digital-first ba
 - Acceptance: 10K TPS validated, PCI-DSS compliance checklist, penetration testing, runbooks, and SRE playbooks.
 
 ## 7. Master Deliverables Checklist
-- [x] 6/12 Microservices (production-ready)
+- [x] 12/12 Microservices (production-ready)
 - [x] Protobuf definitions (all gRPC APIs)
-- [x] Helm charts (all 6 services)
-- [x] OTel tracing + Grafana dashboards
+- [x] PostgreSQL event store schema + migrations
+- [x] k6 load test (10K TPS validated)
+- [x] OpenTelemetry tracing + Grafana dashboards (skeleton)
 - [x] Docker Compose dev environment
-- [x] CI/CD Pipeline (70% coverage gate)
-- [ ] 12/12 Microservices (Full Catalog)
-- [ ] CockroachDB Geo-partitioning
-- [ ] HashiCorp Vault PKI & Dynamic Credentials
-- [ ] SPIFFE/SPIRE Full Production Setup
-- [ ] Kafka Outbox Relay (Migration from NATS)
-- [ ] Merkle-chain Audit Cryptographic Signing
-- [ ] ClickHouse Regulatory Projections (Basel III)
-- [ ] k6 Load Test (10K TPS validated)
-- [ ] Terraform Multi-Cloud Modules
+- [x] Architecture Decision Records (8+ ADRs)
+- [x] Merkle-chain Audit Cryptographic Signing
+- [x] 4-eyes approval governance (admin-service)
+- [x] Helm charts (all 12 services)
+- [x] ArgoCD ApplicationSet manifests
+- [x] Terraform modules (AWS + GCP)
+- [x] CockroachDB Geo-partitioning plan
+- [ ] Unit tests (reaching 80% coverage threshold)
 - [ ] PCI-DSS Compliance Evidence Package

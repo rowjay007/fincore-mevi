@@ -1,0 +1,34 @@
+replicaCount: 3
+
+image:
+  repository: fincore/service
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 50051
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+env:
+  DATABASE_URL: ""
+  VAULT_ADDR: "http://vault:8200"
+  KAFKA_BROKERS: "kafka:9092"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80

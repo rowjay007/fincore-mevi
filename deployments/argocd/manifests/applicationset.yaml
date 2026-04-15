@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fincore-services
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      - name: api-gateway
+        port: "8080"
+      - name: identity-service
+        port: "50051"
+      - name: account-service
+        port: "50052"
+      - name: ledger-service
+        port: "50053"
+      - name: payment-service
+        port: "50054"
+      - name: fraud-engine
+        port: "50061"
+      - name: vault-service
+        port: "50059"
+      - name: fx-service
+        port: "50060"
+      - name: notification-service
+        port: "50062"
+      - name: reporting-service
+        port: "50063"
+      - name: audit-service
+        port: "50058"
+      - name: admin-service
+        port: "50064"
+  template:
+    metadata:
+      name: 'fincore-{{`{{name}}`}}'
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/rowjay/fincore-mevi.git'
+        targetRevision: HEAD
+        path: deployments/helm/fincore-service
+        helm:
+          values: |
+            image:
+              repository: 'fincore/{{`{{name}}`}}'
+            service:
+              port: {{`{{port}}`}}
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: fincore
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
