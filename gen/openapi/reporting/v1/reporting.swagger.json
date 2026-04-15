@@ -1,0 +1,238 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "reporting/v1/reporting.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "ReportingService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/reporting/aml-monitoring": {
+      "get": {
+        "summary": "AML/KYC transaction monitoring report",
+        "operationId": "ReportingService_GetAMLMonitoringReport",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetAMLMonitoringReportResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "riskThreshold",
+            "in": "query",
+            "required": false,
+            "type": "number",
+            "format": "float"
+          }
+        ],
+        "tags": [
+          "ReportingService"
+        ]
+      }
+    },
+    "/v1/reporting/basel-iii": {
+      "get": {
+        "summary": "Regulatory reporting for Basel III compliance",
+        "operationId": "ReportingService_GetBaselIIIReport",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetBaselIIIReportResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ReportingService"
+        ]
+      }
+    },
+    "/v1/reporting/dashboard": {
+      "get": {
+        "summary": "General dashboard stats from OLAP views (ClickHouse)",
+        "operationId": "ReportingService_GetDashboardStats",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetDashboardStatsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "period",
+            "description": "\"24h\", \"7d\", \"30d\"",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ReportingService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AMLAlert": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "transactionId": {
+          "type": "string"
+        },
+        "riskScore": {
+          "type": "number",
+          "format": "float"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "v1GetAMLMonitoringReportResponse": {
+      "type": "object",
+      "properties": {
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1AMLAlert"
+          }
+        },
+        "totalAlerts": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "v1GetBaselIIIReportResponse": {
+      "type": "object",
+      "properties": {
+        "capitalRatio": {
+          "type": "string"
+        },
+        "liquidityCoverageRatio": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "v1GetDashboardStatsResponse": {
+      "type": "object",
+      "properties": {
+        "totalTransactions": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalVolumeKobo": {
+          "type": "string"
+        },
+        "avgFraudScore": {
+          "type": "number",
+          "format": "float"
+        }
+      }
+    }
+  }
+}

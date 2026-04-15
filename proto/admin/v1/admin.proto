@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package fincore.admin.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "fincore/gen/go/admin/v1;adminv1";
+
+service AdminService {
+  // Propose a sensitive back-office operation (requires 4-eyes approval)
+  rpc ProposeOperation(ProposeOperationRequest) returns (ProposeOperationResponse) {
+    option (google.api.http) = {
+      post: "/v1/admin/operations:propose"
+      body: "*"
+    };
+  }
+
+  // Approve a pending operation (2nd pair of eyes)
+  rpc ApproveOperation(ApproveOperationRequest) returns (ApproveOperationResponse) {
+    option (google.api.http) = {
+      post: "/v1/admin/operations/{operation_id}:approve"
+      body: "*"
+    };
+  }
+
+  // Manage feature flags for rollout control
+  rpc SetFeatureFlag(SetFeatureFlagRequest) returns (SetFeatureFlagResponse) {
+    option (google.api.http) = {
+      post: "/v1/admin/feature-flags"
+      body: "*"
+    };
+  }
+
+  // View operator audit logs
+  rpc ListAdminAuditLogs(ListAdminAuditLogsRequest) returns (ListAdminAuditLogsResponse) {
+    option (google.api.http) = {
+      get: "/v1/admin/audit-logs"
+    };
+  }
+}
+
+message ProposeOperationRequest {
+  string operator_id = 1;
+  string action = 2;       // e.g. "USER_UNSUSPEND", "FEE_OVERRIDE"
+  string resource_id = 3;
+  google.protobuf.Struct details = 4;
+}
+
+message ProposeOperationResponse {
+  string operation_id = 1;
+  string status = 2;        // "pending_approval"
+}
+
+message ApproveOperationRequest {
+  string operation_id = 1;
+  string approver_id = 2;
+  string comment = 3;
+}
+
+message ApproveOperationResponse {
+  bool success = 1;
+  string status = 2;        // "executed", "failed"
+}
+
+message SetFeatureFlagRequest {
+  string key = 1;
+  bool enabled = 2;
+  float rollout_percentage = 3; // 0.0 to 1.0 for canary
+}
+
+message SetFeatureFlagResponse {
+  bool success = 1;
+}
+
+message ListAdminAuditLogsRequest {
+  string operator_id = 1;
+  int32 limit = 2;
+}
+
+message AdminAuditLogEntry {
+  string id = 1;
+  string operator_id = 2;
+  string action = 3;
+  string resource_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message ListAdminAuditLogsResponse {
+  repeated AdminAuditLogEntry logs = 1;
+}

@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package fincore.reporting.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "fincore/gen/go/reporting/v1;reportingv1";
+
+service ReportingService {
+  // Regulatory reporting for Basel III compliance
+  rpc GetBaselIIIReport(GetBaselIIIReportRequest) returns (GetBaselIIIReportResponse) {
+    option (google.api.http) = {
+      get: "/v1/reporting/basel-iii"
+    };
+  }
+
+  // AML/KYC transaction monitoring report
+  rpc GetAMLMonitoringReport(GetAMLMonitoringReportRequest) returns (GetAMLMonitoringReportResponse) {
+    option (google.api.http) = {
+      get: "/v1/reporting/aml-monitoring"
+    };
+  }
+
+  // General dashboard stats from OLAP views (ClickHouse)
+  rpc GetDashboardStats(GetDashboardStatsRequest) returns (GetDashboardStatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/reporting/dashboard"
+    };
+  }
+}
+
+message GetBaselIIIReportRequest {
+  google.protobuf.Timestamp start_date = 1;
+  google.protobuf.Timestamp end_date = 2;
+  string currency = 3;
+}
+
+message GetBaselIIIReportResponse {
+  string capital_ratio = 1;
+  string liquidity_coverage_ratio = 2;
+  google.protobuf.Timestamp generated_at = 3;
+}
+
+message GetAMLMonitoringReportRequest {
+  google.protobuf.Timestamp start_date = 1;
+  google.protobuf.Timestamp end_date = 2;
+  float risk_threshold = 3;
+}
+
+message AMLAlert {
+  string user_id = 1;
+  string transaction_id = 2;
+  float risk_score = 3;
+  string reason = 4;
+}
+
+message GetAMLMonitoringReportResponse {
+  repeated AMLAlert alerts = 1;
+  int32 total_alerts = 2;
+}
+
+message GetDashboardStatsRequest {
+  string period = 1; // "24h", "7d", "30d"
+}
+
+message GetDashboardStatsResponse {
+  int64 total_transactions = 1;
+  string total_volume_kobo = 2;
+  float avg_fraud_score = 3;
+}

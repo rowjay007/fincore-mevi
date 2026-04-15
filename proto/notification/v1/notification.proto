@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package fincore.notification.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "fincore/gen/go/notification/v1;notificationv1";
+
+service NotificationService {
+  // Send a direct notification (bypass async queue for high priority)
+  rpc SendNotification(SendNotificationRequest) returns (SendNotificationResponse) {
+    option (google.api.http) = {
+      post: "/v1/notification/send"
+      body: "*"
+    };
+  }
+
+  // Get status of a notification delivery
+  rpc GetNotificationStatus(GetNotificationStatusRequest) returns (GetNotificationStatusResponse) {
+    option (google.api.http) = {
+      get: "/v1/notification/status/{notification_id}"
+    };
+  }
+}
+
+message SendNotificationRequest {
+  string user_id = 1;
+  string template_id = 2;   // e.g. "payment_settled", "login_alert"
+  string channel = 3;       // "email", "sms", "push", "webhook"
+  google.protobuf.Struct data = 4; // Template variables
+}
+
+message SendNotificationResponse {
+  string notification_id = 1;
+  string status = 2;        // "queued", "sent", "failed"
+}
+
+message GetNotificationStatusRequest {
+  string notification_id = 1;
+}
+
+message GetNotificationStatusResponse {
+  string notification_id = 1;
+  string status = 2;
+  google.protobuf.Timestamp sent_at = 3;
+  string error_message = 4;
+}
