@@ -10,29 +10,43 @@ import (
 
 	adminv1 "fincore/gen/go/admin/v1"
 	"fincore/pkg/security"
+	"fincore/services/admin-service/domain"
+	"fincore/services/admin-service/infrastructure/postgres"
+
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type adminServer struct {
 	adminv1.UnimplementedAdminServiceServer
+	adminRepo domain.AdminPort
 }
 
 func (s *adminServer) ProposeOperation(ctx context.Context, req *adminv1.ProposeOperationRequest) (*adminv1.ProposeOperationResponse, error) {
-	// Sensitive back-office actions like unfreezing large accounts
-	// require a 2nd pair of eyes (the 4-eyes principle).
-	log.Printf("ADMIN: Operator %s proposed %s on %s", req.OperatorId, req.Action, req.ResourceId)
-	
+	id, err := s.adminRepo.Propose(ctx, domain.AdminOperation{
+		OperatorID: req.OperatorId,
+		Action:     req.Action,
+		ResourceID: req.ResourceId,
+		Details:    req.Details.AsMap(),
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to propose operation: %v", err)
+	}
+
 	return &adminv1.ProposeOperationResponse{
-		OperationId: "op_94302",
+		OperationId: id,
 		Status:      "pending_approval",
 	}, nil
 }
 
 func (s *adminServer) ApproveOperation(ctx context.Context, req *adminv1.ApproveOperationRequest) (*adminv1.ApproveOperationResponse, error) {
-	// 2nd pair of eyes approval. In real prod, operator_id != approver_id.
-	log.Printf("ADMIN: Approver %s approved operation %s", req.ApproverId, req.OperationId)
+	err := s.adminRepo.Approve(ctx, req.OperationId, req.ApproverId)
+	if err != nil {
+		return nil, status.Errorf(codes.PermissionDenied, "approval failed: %v", err)
+	}
 
 	return &adminv1.ApproveOperationResponse{
 		Success: true,
@@ -41,7 +55,10 @@ func (s *adminServer) ApproveOperation(ctx context.Context, req *adminv1.Approve
 }
 
 func (s *adminServer) SetFeatureFlag(ctx context.Context, req *adminv1.SetFeatureFlagRequest) (*adminv1.SetFeatureFlagResponse, error) {
-	log.Printf("ADMIN: Set feature flag %s to %v (rollout: %v)", req.Key, req.Enabled, req.RolloutPercentage)
+	err := s.adminRepo.SetFeatureFlag(ctx, req.Key, req.Enabled, req.RolloutPercentage)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to set feature flag: %v", err)
+	}
 	return &adminv1.SetFeatureFlagResponse{Success: true}, nil
 }
 
@@ -72,6 +89,8 @@ func main() {
 		defer shutdown(ctx)
 	}
 
+	adminRepo := postgres.NewPostgresAdminRepo()
+
 	listenAddr := os.Getenv("LISTEN_ADDR")
 	if listenAddr == "" {
 		listenAddr = ":50064"
@@ -83,7 +102,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	adminv1.RegisterAdminServiceServer(s, &adminServer{})
+	adminv1.RegisterAdminServiceServer(s, &adminServer{adminRepo: adminRepo})
 	reflection.Register(s)
 
 	log.Printf("admin-service (Back-office/4-eyes) listening on %s", listenAddr)

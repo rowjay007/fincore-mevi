@@ -11,30 +11,50 @@ import (
 
 	notificationv1 "fincore/gen/go/notification/v1"
 	"fincore/pkg/security"
+	"fincore/services/notification-service/domain"
+	"fincore/services/notification-service/infrastructure/messaging"
+
 	"github.com/nats-io/nats.go"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 type notificationServer struct {
 	notificationv1.UnimplementedNotificationServiceServer
-	nc *nats.Conn
+	nc       *nats.Conn
+	notifier domain.NotificationPort
 }
 
 func (s *notificationServer) SendNotification(ctx context.Context, req *notificationv1.SendNotificationRequest) (*notificationv1.SendNotificationResponse, error) {
 	// Sync path: High priority direct send
-	log.Printf("NOTIFICATION: Sending %s to user %s via %s", req.TemplateId, req.UserId, req.Channel)
-	
+	id, err := s.notifier.Send(ctx, domain.Notification{
+		UserID:     req.UserId,
+		TemplateID: req.TemplateId,
+		Channel:    req.Channel,
+		Data:       req.Data.AsMap(),
+	})
+	if err != nil {
+		return nil, grpcstatus.Errorf(codes.Internal, "failed to send notification: %v", err)
+	}
+
 	return &notificationv1.SendNotificationResponse{
-		NotificationId: "notif_sync_" + req.UserId,
+		NotificationId: id,
 		Status:         "sent",
 	}, nil
 }
 
 func (s *notificationServer) GetNotificationStatus(ctx context.Context, req *notificationv1.GetNotificationStatusRequest) (*notificationv1.GetNotificationStatusResponse, error) {
+	status, err := s.notifier.GetStatus(ctx, req.NotificationId)
+	if err != nil {
+		return nil, grpcstatus.Errorf(codes.NotFound, "notification not found: %v", err)
+	}
+
 	return &notificationv1.GetNotificationStatusResponse{
-		NotificationId: req.NotificationId,
-		Status:         "sent",
+		NotificationId: status.ID,
+		Status:         status.Status,
+		ErrorMessage:   status.Error,
 	}, nil
 }
 
@@ -67,6 +87,8 @@ func main() {
 		log.Printf("NOTIFICATION: Async login alert for user %v", data["user_id"])
 	})
 
+	notifier := messaging.NewDummyNotifier()
+
 	listenAddr := os.Getenv("LISTEN_ADDR")
 	if listenAddr == "" {
 		listenAddr = ":50062"
@@ -78,7 +100,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	notificationv1.RegisterNotificationServiceServer(s, &notificationServer{nc: nc})
+	notificationv1.RegisterNotificationServiceServer(s, &notificationServer{nc: nc, notifier: notifier})
 	reflection.Register(s)
 
 	log.Printf("notification-service listening on %s", listenAddr)

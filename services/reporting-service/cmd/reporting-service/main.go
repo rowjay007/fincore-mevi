@@ -10,47 +10,72 @@ import (
 
 	reportingv1 "fincore/gen/go/reporting/v1"
 	"fincore/pkg/security"
+	"fincore/services/reporting-service/domain"
+	"fincore/services/reporting-service/infrastructure/clickhouse"
+
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type reportingServer struct {
 	reportingv1.UnimplementedReportingServiceServer
+	reporter domain.ReportingPort
 }
 
 func (s *reportingServer) GetBaselIIIReport(ctx context.Context, req *reportingv1.GetBaselIIIReportRequest) (*reportingv1.GetBaselIIIReportResponse, error) {
-	// In production, this would query ClickHouse for denormalized regulatory metrics.
-	// Basel III requires Tier 1 capital ratios and LCR (Liquidity Coverage Ratio).
+	start := req.StartDate.AsTime()
+	end := req.EndDate.AsTime()
+
+	res, err := s.reporter.GetBaselIIIReport(ctx, start, end)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to generate Basel III report: %v", err)
+	}
+
 	return &reportingv1.GetBaselIIIReportResponse{
-		CapitalRatio:           "12.5%",
-		LiquidityCoverageRatio: "115.2%",
-		GeneratedAt:            timestamppb.Now(),
+		CapitalRatio:           res.CapitalRatio,
+		LiquidityCoverageRatio: res.LiquidityCoverageRatio,
+		GeneratedAt:            timestamppb.New(res.GeneratedAt),
 	}, nil
 }
 
 func (s *reportingServer) GetAMLMonitoringReport(ctx context.Context, req *reportingv1.GetAMLMonitoringReportRequest) (*reportingv1.GetAMLMonitoringReportResponse, error) {
-	// Query ClickHouse for suspicious patterns (e.g. structuring, rapid movement).
-	alerts := []*reportingv1.AMLAlert{
-		{
-			UserId:        "user_123",
-			TransactionId: "tx_456",
-			RiskScore:     0.88,
-			Reason:        "Rapid succession of high-value transfers (structuring)",
-		},
+	start := req.StartDate.AsTime()
+	end := req.EndDate.AsTime()
+
+	res, err := s.reporter.GetAMLMonitoringReport(ctx, start, end, req.RiskThreshold)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to generate AML report: %v", err)
 	}
+
+	var alerts []*reportingv1.AMLAlert
+	for _, a := range res {
+		alerts = append(alerts, &reportingv1.AMLAlert{
+			UserId:        a.UserID,
+			TransactionId: a.TransactionID,
+			RiskScore:     a.RiskScore,
+			Reason:        a.Reason,
+		})
+	}
+
 	return &reportingv1.GetAMLMonitoringReportResponse{
 		Alerts:      alerts,
-		TotalAlerts: 1,
+		TotalAlerts: int32(len(alerts)),
 	}, nil
 }
 
 func (s *reportingServer) GetDashboardStats(ctx context.Context, req *reportingv1.GetDashboardStatsRequest) (*reportingv1.GetDashboardStatsResponse, error) {
-	// Aggregated metrics from ClickHouse
+	res, err := s.reporter.GetDashboardStats(ctx, req.Period)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get dashboard stats: %v", err)
+	}
+
 	return &reportingv1.GetDashboardStatsResponse{
-		TotalTransactions: 1540230,
-		TotalVolumeKobo:   "943029432043",
-		AvgFraudScore:     0.04,
+		TotalTransactions: res.TotalTransactions,
+		TotalVolumeKobo:   res.TotalVolumeKobo,
+		AvgFraudScore:     res.AvgFraudScore,
 	}, nil
 }
 
@@ -66,6 +91,8 @@ func main() {
 		defer shutdown(ctx)
 	}
 
+	reporter := clickhouse.NewClickHouseReporter()
+
 	listenAddr := os.Getenv("LISTEN_ADDR")
 	if listenAddr == "" {
 		listenAddr = ":50063"
@@ -77,7 +104,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	reportingv1.RegisterReportingServiceServer(s, &reportingServer{})
+	reportingv1.RegisterReportingServiceServer(s, &reportingServer{reporter: reporter})
 	reflection.Register(s)
 
 	log.Printf("reporting-service (OLAP/Basel III) listening on %s", listenAddr)
