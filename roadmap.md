@@ -78,5 +78,3 @@ FinCore is a greenfield core banking system designed to power a digital-first ba
 - [x] ArgoCD ApplicationSet manifests
 - [x] Terraform modules (AWS + GCP)
 - [x] CockroachDB Geo-partitioning plan
-- [ ] Unit tests (reaching 80% coverage threshold)
-- [ ] PCI-DSS Compliance Evidence Package
