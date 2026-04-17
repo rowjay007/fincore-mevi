@@ -13,6 +13,7 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
 
 jobs:
   pipeline:
@@ -20,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -33,7 +36,6 @@ jobs:
     - name: Static Analysis
       run: |
         go vet ./...
-        # Install staticcheck if not cached
         if ! command -v staticcheck &> /dev/null; then
           go install honnef.co/go/tools/cmd/staticcheck@latest
         fi
@@ -44,13 +46,15 @@ jobs:
 
     - name: Run All Tests
       run: |
-        # Focus coverage only on domain and application logic to avoid covdata errors in infra/cmd packages
-        TESTABLE_PKGS="./pkg/... ./services/account-service/domain ./services/ledger-service/domain ./services/payment-service/domain ./services/payment-service/application/saga ./services/payment-service/application/workflows"
+        # Only run coverage on packages that actually have _test.go files to avoid covdata errors
+        COVERABLE_PKGS=$(find . -name "*_test.go" -exec dirname {} + | sort -u | sed 's|^\./|fincore/|' | grep -v "/cmd/" | grep -v "/gen/" | tr '\n' ' ')
         
-        echo "Collecting coverage for domain/application/pkg..."
-        go test -v -race $TESTABLE_PKGS -coverprofile=coverage.txt -covermode=atomic
+        echo "Collecting coverage for verified testable packages..."
+        if [ -n "$COVERABLE_PKGS" ]; then
+          go test -v -race $COVERABLE_PKGS -coverprofile=coverage.txt -covermode=atomic
+        fi
         
-        echo "Testing all other packages (no coverage verification)..."
+        echo "Testing entire codebase for correctness (no coverage)..."
         go test -v -race ./...
 
     - name: Check Coverage
@@ -58,5 +62,5 @@ jobs:
         if [ -f coverage.txt ]; then
           go tool cover -func=coverage.txt | grep total | awk '{print $3}'
         else
-          echo "No coverage file generated"
+          echo "No coverage file generated - this is expected if no matching packages were found"
         fi
