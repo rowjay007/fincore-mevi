@@ -67,6 +67,29 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <Sidebar collapsible="icon" {...props}>
+        <SidebarHeader>
+          <div className="h-12 w-full animate-pulse bg-muted rounded-md" />
+        </SidebarHeader>
+        <SidebarContent>
+          <div className="p-4 space-y-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="h-8 w-full animate-pulse bg-muted rounded-md" />
+            ))}
+          </div>
+        </SidebarContent>
+      </Sidebar>
+    )
+  }
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -91,7 +114,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenu>
               {data.navMain.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title} isActive={item.isActive}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
                     <a href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
