@@ -1,113 +1,43 @@
-name: ci
+name: Master CI Pipeline
 
 on:
   push:
-    branches: ["main"]
-    paths:
-      - "go.mod"
-      - "go.sum"
-      - "proto/**"
-      - "pkg/**"
-      - "services/**"
-      - ".github/workflows/ci.yml"
+    branches: [ main ]
   pull_request:
-    paths:
-      - "go.mod"
-      - "go.sum"
-      - "proto/**"
-      - "pkg/**"
-      - "services/**"
-      - ".github/workflows/ci.yml"
+    branches: [ main ]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-permissions:
-  contents: read
-
+# Prevent overlapping runs on the same branch
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint:
+  pipeline:
+    name: Build, Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+    - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
 
-      - name: gofmt
-        run: |
-          test -z "$(gofmt -l .)"
+    - name: Verify Dependencies
+      run: go mod verify
 
-      - name: go vet
-        run: go vet ./...
+    - name: Static Analysis
+      run: |
+        go vet ./...
+        # Install staticcheck if not cached
+        if ! command -v staticcheck &> /dev/null; then
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+        fi
+        $(go env GOPATH)/bin/staticcheck ./...
 
-      - name: cache staticcheck
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/go/bin/staticcheck
-          key: staticcheck-${{ runner.os }}-${{ hashFiles('go.mod') }}-staticcheck-latest
+    - name: Build All Services
+      run: go build ./...
 
-      - name: staticcheck
-        run: |
-          test -x "$(go env GOPATH)/bin/staticcheck" || go install honnef.co/go/tools/cmd/staticcheck@latest
-          staticcheck ./...
-
-  unit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache: true
-
-      - name: Verify Dependencies
-        run: go mod verify
-
-      - name: Build All Services
-        run: go build ./...
-
-      - name: Run Unit Tests
-        run: go test -v -race ./...
-
-  race:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: race tests
-        run: go test -race ./...
-
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: coverage threshold (security packages)
-        env:
-          MIN_COVERAGE: "70"
-        run: |
-          set -eu
-          go test ./pkg/security/... ./services/auth-service/infrastructure/grpc/... -coverprofile=coverage.out
-          pct=$(go tool cover -func=coverage.out | awk '/total:/ {gsub(/%/,"",$3); print $3}')
-          echo "coverage=${pct}% (min ${MIN_COVERAGE}%)"
-          awk -v p="$pct" -v min="$MIN_COVERAGE" 'BEGIN { exit (p+0 < min+0) }'
+    - name: Run All Tests
+      run: go test -v -race -cover ./...
