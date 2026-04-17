@@ -45,13 +45,12 @@ jobs:
     - name: Run All Tests
       run: |
         # Focus coverage only on domain and application logic to avoid covdata errors in infra/cmd packages
-        # These layers contain the core banking rules and are the most important to verify
         TESTABLE_PKGS="./pkg/... ./services/account-service/domain ./services/ledger-service/domain ./services/payment-service/domain ./services/payment-service/application/saga ./services/payment-service/application/workflows"
         
         echo "Collecting coverage for domain/application/pkg..."
         go test -v -race $TESTABLE_PKGS -coverprofile=coverage.txt -covermode=atomic
         
-        echo "Testing all other packages (no coverage)..."
+        echo "Testing all other packages (no coverage verification)..."
         go test -v -race ./...
 
     - name: Check Coverage
