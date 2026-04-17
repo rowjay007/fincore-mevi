@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Activity, ShieldCheck, Zap, AlertTriangle, ArrowUpRight, ArrowDownLeft } from "lucide-react"
@@ -45,24 +45,28 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
   const [transactions, setTransactions] = useState<any[]>([])
   const [tps, setTps] = useState(8400)
+  const [realtimeChartData, setRealtimeChartData] = useState([4500, 7200, 9800, 10400, 8900, 11000])
 
-  const chartData = {
+  const chartData = useMemo(() => ({
     labels: ["10:00", "10:05", "10:10", "10:15", "10:20", "10:25"],
     datasets: [
       {
         fill: true,
         label: 'Throughput (TPS)',
-        data: [4500, 7200, 9800, 10400, 8900, 11000],
+        data: realtimeChartData,
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         tension: 0.4,
       },
     ],
-  }
+  }), [realtimeChartData])
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: {
+      duration: 1000
+    },
     plugins: {
       legend: {
         display: false,
@@ -92,7 +96,7 @@ export default function DashboardPage() {
     },
   }
 
-  // Handle hydration
+  // Handle hydration and live updates
   useEffect(() => {
     setMounted(true)
     const initialTransactions = Array.from({ length: 6 }, generateTransaction)
@@ -103,8 +107,10 @@ export default function DashboardPage() {
 
       setTransactions(prev => [newTx, ...prev.slice(0, 5)])
 
-      const newTps = Math.floor(Math.random() * (12000 - 8000 + 1)) + 8000
-      setTps(newTps)
+      const newTpsValue = Math.floor(Math.random() * (12000 - 8000 + 1)) + 8000
+      setTps(newTpsValue)
+
+      setRealtimeChartData(prev => [...prev.slice(1), newTpsValue])
 
       if (newTx.status === "Flagged") {
         toast.error(`High Risk Detected: Tx ${newTx.id}`, {
@@ -116,7 +122,20 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [])
 
-  if (!mounted) return null
+  if (!mounted) {
+    return (
+      <div className="space-y-8 max-w-7xl mx-auto animate-pulse">
+        <div className="h-10 w-1/3 bg-muted rounded"></div>
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-muted rounded"></div>)}
+        </div>
+        <div className="grid gap-4 md:grid-cols-7">
+          <div className="col-span-4 h-[400px] bg-muted rounded"></div>
+          <div className="col-span-3 h-[400px] bg-muted rounded"></div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
