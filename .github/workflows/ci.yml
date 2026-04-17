@@ -28,7 +28,7 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.23'
-        cache: true
+        cache: false # Disable setup-go's internal cache to fix 'tar' error in large monorepo
 
     - name: Verify Dependencies
       run: go mod verify
