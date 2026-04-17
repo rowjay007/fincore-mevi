@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   pipeline:
     name: Build, Lint & Test
@@ -40,4 +43,8 @@ jobs:
       run: go build ./...
 
     - name: Run All Tests
-      run: go test -v -race -cover ./...
+      run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+    - name: Check Coverage
+      run: |
+        go tool cover -func=coverage.txt | grep total | awk '{print $3}'
