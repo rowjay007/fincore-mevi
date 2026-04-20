@@ -41,29 +41,70 @@ The Next.js dashboard provides a real-time command center:
 
 ## ⚡ Quick Start
 
-### Prerequisites
+### 1. Prerequisites
 - **Docker & Docker Compose**
 - **Go 1.23+**
-- **Node.js 24+**
+- **Node.js 24+** (for High-Fidelity Dashboard)
 
-### Deployment in 3 Steps
+### 2. Environment Configuration
+Copy the sample environment file and adjust variables as needed:
+```bash
+cp .env.example .env
+```
 
-1. **Spin up Infrastructure Cells**:
-   ```bash
-   docker-compose up -d
-   ```
-   *This starts CockroachDB, Kafka, Temporal, HashiCorp Vault, and SPIRE.*
+### 3. Launching the Ecosystem
 
-2. **Initialize Secrets**:
-   ```bash
-   # (Scripts provided in /scripts to auto-unseal Vault)
-   ./scripts/bootstrap-vault.sh
-   ```
+#### Phase A: Infrastructure & Security
+Start the "Security Cell" (Vault & SPIRE) and core backing services:
+```bash
+# Start Vault & SPIRE
+make sec-up
 
-3. **Launch Dashboard**:
-   ```bash
-   cd webapp && npm install && npm run dev
-   ```
+# Seed security identities (OIDC clients & SVIDs)
+make sec-seed
+
+# Start CockroachDB, Kafka, and Temporal
+docker-compose up -d
+```
+
+#### Phase B: Dashboard
+The command center provides real-time telemetry and management:
+```bash
+cd webapp
+npm install
+npm run dev
+```
+
+#### Phase C: Microservices
+Each service can be started individually or via the service grid. Example:
+```bash
+# Start the Gateway (Entry point)
+go run services/api-gateway/cmd/api-gateway/main.go
+
+# Start Identity (Auth & WebAuthn)
+go run services/identity-service/cmd/identity-service/*.go
+```
+
+## 🛠️ Service Map & Ports
+
+| Service | Port | Description |
+| :--- | :--- | :--- |
+| **Dashboard** | `3000` | High-fidelity Next.js command center |
+| **API Gateway** | `8080` | Entry point, Chaos Monkey, Rate Limiting |
+| **Identity** | `8084` | OIDC, JWKS, WebAuthn/Passkey Login |
+| **Vault** | `8200` | PII Tokenization & Secret Management |
+| **CockroachDB** | `26257` | Distributed strong-consistency ledger |
+| **Temporal** | `7233` | Distributed Saga Orchestration |
+
+## 🧪 Testing & Resilience
+Run the full suite to verify mTLS boundaries and Merkle integrity:
+```bash
+# Run all Go tests with race detection
+go test -race ./...
+
+# Trigger Chaos Monkey in Gateway
+export ENABLE_CHAOS=true
+```
 
 ## 📜 License
 
