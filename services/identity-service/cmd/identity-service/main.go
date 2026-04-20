@@ -55,6 +55,7 @@ type authorizePageData struct {
 	CodeChallengeMethod string
 	CSRFToken           string
 	LoggedIn            bool
+	WebAuthnEnabled     bool
 }
 
 var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype html>
@@ -62,41 +63,95 @@ var authorizePageTmpl = template.Must(template.New("authorize").Parse(`<!doctype
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Authorize</title>
+    <title>Authorize | FinCore Identity</title>
+    <script src="https://unpkg.com/@passwordless-id/webauthn@1.2.2/dist/bundle.iife.js"></script>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+      .card { background: #111; border: 1px solid #333; padding: 2rem; border-radius: 1rem; width: 100%; max-width: 400px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+      h1 { font-size: 1.5rem; margin-bottom: 0.5rem; font-weight: 800; }
+      .subtitle { color: #888; font-size: 0.875rem; margin-bottom: 2rem; }
+      label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 0.5rem; }
+      input[type="email"], input[type="password"] { width: 100%; background: #000; border: 1px solid #333; padding: 0.75rem; border-radius: 0.5rem; color: #fff; margin-bottom: 1.5rem; box-sizing: border-box; }
+      button { width: 100%; background: #3b82f6; color: #fff; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+      button:hover { background: #2563eb; }
+      .webauthn-btn { background: #10b981; margin-top: 1rem; }
+      .webauthn-btn:hover { background: #059669; }
+      .error { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; margin-bottom: 1.5rem; border: 1px solid rgba(239, 68, 68, 0.2); }
+      .approve-label { display: flex; items-center: center; gap: 0.5rem; font-size: 0.875rem; color: #aaa; text-transform: none; margin-bottom: 1.5rem; cursor: pointer; }
+    </style>
   </head>
   <body>
-    <h1>Authorize</h1>
-    {{if .Error}}<p style="color:#b00020">{{.Error}}</p>{{end}}
-    <p>Client: <code>{{.ClientID}}</code></p>
-    <p>Scope: <code>{{.Scope}}</code></p>
-    <form method="post" action="/oauth/authorize">
-      <input type="hidden" name="client_id" value="{{.ClientID}}" />
-      <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}" />
-      <input type="hidden" name="scope" value="{{.Scope}}" />
-      <input type="hidden" name="state" value="{{.State}}" />
-      <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}" />
-      <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}" />
-      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}" />
+    <div class="card">
+      <h1>FinCore Identity</h1>
+      <p class="subtitle">Securely authorize <code>{{.ClientID}}</code></p>
+      
+      {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+      
+      <form id="auth-form" method="post" action="/oauth/authorize">
+        <input type="hidden" name="client_id" value="{{.ClientID}}" />
+        <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}" />
+        <input type="hidden" name="scope" value="{{.Scope}}" />
+        <input type="hidden" name="state" value="{{.State}}" />
+        <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}" />
+        <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}" />
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}" />
 
-      {{if not .LoggedIn}}
-      <label>Email<br />
-        <input type="email" name="email" autocomplete="username" required />
-      </label>
-      <br />
-      <label>Password<br />
-        <input type="password" name="password" autocomplete="current-password" required />
-      </label>
-      <br />
-      {{else}}
-      <p>Logged in</p>
-      {{end}}
-      <label>
-        <input type="checkbox" name="approve" value="yes" required />
-        Approve
-      </label>
-      <br />
-      <button type="submit">Continue</button>
-    </form>
+        {{if not .LoggedIn}}
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" autocomplete="username" placeholder="name@company.com" required />
+        
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required />
+        {{end}}
+
+        <label class="approve-label">
+          <input type="checkbox" name="approve" value="yes" checked required />
+          I approve this authorization request
+        </label>
+
+        <button type="submit">Continue with Password</button>
+        
+        <button type="button" id="webauthn-login" class="webauthn-btn">
+          Sign in with Passkey
+        </button>
+      </form>
+    </div>
+
+    <script>
+      const webauthnBtn = document.getElementById('webauthn-login');
+      webauthnBtn.addEventListener('click', async () => {
+        const email = document.getElementById('email')?.value;
+        if (!email) {
+          alert('Please enter your email first to use a Passkey');
+          return;
+        }
+
+        try {
+          // 1. Get options from server
+          const resp = await fetch('/webauthn/login/begin?email=' + encodeURIComponent(email));
+          if (!resp.ok) throw new Error('Failed to begin WebAuthn');
+          const options = await resp.json();
+
+          // 2. Authenticate with hardware/biometrics
+          const assertion = await window.WebAuthn.authenticate(options.publicKey);
+
+          // 3. Finish on server
+          const finishResp = await fetch('/webauthn/login/finish', {
+            method: 'POST',
+            body: JSON.stringify(assertion)
+          });
+          
+          if (finishResp.ok) {
+            window.location.reload(); // Session cookie set, reload to authorize
+          } else {
+            alert('Passkey verification failed');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('WebAuthn Error: ' + err.message);
+        }
+      });
+    </script>
   </body>
 </html>`))
 

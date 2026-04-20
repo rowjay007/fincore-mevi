@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.4.0",
+    "@passwordless-id/webauthn": "^2.3.5",
     "@tanstack/react-query": "^5.99.0",
     "@tanstack/react-table": "^8.21.3",
     "@types/chart.js": "^2.9.41",
@@ -43,7 +44,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.39",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-simple-maps": "^3.0.6",
