@@ -62,7 +62,7 @@ func TestOAuth2ErrorFromGRPC_PermissionDenied(t *testing.T) {
 }
 
 func TestAuthorizeCSRF_MissingTokenRedirectsError(t *testing.T) {
-	h := newHTTPHandler(http.NewServeMux(), nil, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
+	h := newHTTPHandler(http.NewServeMux(), nil, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil, "http://example")
 
 	// First GET should set CSRF cookie.
 	getReq := httptest.NewRequest(http.MethodGet, "http://example/oauth/authorize?response_type=code&client_id=c1&redirect_uri=https%3A%2F%2Fapp.example%2Fcb&scope=openid&state=s&code_challenge=ch&code_challenge_method=S256", nil)
@@ -207,7 +207,7 @@ func TestOAuthToken_HTTP_InvalidClient_UsesRFCBodyAndWWWAuthenticate(t *testing.
 		}
 		return nil, status.Error(codes.Unauthenticated, "invalid_client")
 	}}
-	h := newHTTPHandler(http.NewServeMux(), client, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
+	h := newHTTPHandler(http.NewServeMux(), client, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil, "http://example")
 
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
@@ -239,7 +239,7 @@ func TestOAuthToken_HTTP_UnsupportedGrantType_ReturnsUnsupportedGrantType(t *tes
 	client := stubAuthClient{oauthToken: func(ctx context.Context, in *authv1.OAuthTokenRequest, opts ...grpc.CallOption) (*authv1.OAuthTokenResponse, error) {
 		return nil, status.Error(codes.InvalidArgument, "unsupported grant_type")
 	}}
-	h := newHTTPHandler(http.NewServeMux(), client, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
+	h := newHTTPHandler(http.NewServeMux(), client, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil, "http://example")
 
 	form := url.Values{}
 	form.Set("grant_type", "client_credentials")
@@ -261,7 +261,7 @@ func TestOAuthToken_HTTP_UnsupportedGrantType_ReturnsUnsupportedGrantType(t *tes
 }
 
 func TestOAuthLogoutCookie_SetsSecureWhenTLS(t *testing.T) {
-	h := newHTTPHandler(http.NewServeMux(), stubAuthClient{}, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil)
+	h := newHTTPHandler(http.NewServeMux(), stubAuthClient{}, openIDConfiguration{}, security.JWKS{}, "/.well-known/jwks.json", nil, "https://example")
 
 	req := httptest.NewRequest(http.MethodPost, "https://example/oauth/logout", nil)
 	req.TLS = &tls.ConnectionState{}
