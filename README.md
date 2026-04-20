@@ -1,52 +1,59 @@
-# FinCore OS: Bank-in-a-Box
+# FinCore OS: Enterprise Banking Engine
 
-FinCore is a high-performance, multi-region banking engine built for 10M+ daily transactions.
+FinCore is a high-performance, multi-region banking engine built for 10M+ daily transactions. It implements a **Triple-Entry Immutable Ledger** with strong consistency across geo-distributed regions.
 
-## Quick Start (All-in-One)
+## 🏗️ High-Level Architecture
+
+The system is composed of 12 core microservices orchestrated via **Temporal** and synchronized via **Kafka**.
+
+### Service Grid
+- **api-gateway**: Entry point with rate-limiting, JWT validation, and Chaos Monkey middleware.
+- **identity-service**: OIDC discovery + JWKS provider + WebAuthn/Passkey support.
+- **auth-service**: Core OAuth2 PKCE logic & client registry.
+- **account-service**: CQRS-based account lifecycle management.
+- **ledger-service**: Double-entry ledger with Merkle Tree integrity validation.
+- **payment-service**: Distributed transaction orchestrator (Saga pattern).
+- **fraud-engine**: Real-time heuristic and ML-based risk evaluation.
+- **audit-service**: Immutable audit logging and Merkle chain verification.
+- **fx-service**: Real-time currency exchange and settlement.
+- **vault-service**: PII tokenization and secret management via HashiCorp Vault.
+- **notification-service**: Async event-driven alerts.
+- **reporting-service**: OLAP data warehouse synchronization.
+
+## 🚀 Key Features
+
+### 📡 High-Fidelity Observability
+The Next.js dashboard provides a real-time command center:
+- **Live Trace Explorer**: Full gRPC span visualization via OpenTelemetry.
+- **3D Global Map**: Real-time liquidity movement across US, EU, and Asia.
+- **AI Investigator**: Natural language behavioral forensics powered by Vercel AI SDK.
+
+### 🛡️ Zero-Trust Security
+- **SPIFFE/mTLS**: Automated workload identities for all inter-service communication.
+- **WebAuthn/Passkeys**: Biometric-first authentication.
+- **Merkle Chain Integrity**: Cryptographically proven ledger history.
+
+## 🛠️ Infrastructure Stack
+- **Database**: CockroachDB (Strong Consistency, Geo-Partitioned).
+- **Messaging**: Kafka (Event Sourcing & Outbox Relay).
+- **Orchestration**: Temporal (Distributed Sagas & Workflows).
+- **Secrets**: HashiCorp Vault.
+- **Identity**: SPIRE (Workload API).
+
+## ⚡ Quick Start
 
 ```bash
-# 1. Start Infrastructure (Postgres, Kafka, Temporal, Vault)
+# 1. Start Infrastructure (Postgres, Kafka, Temporal, Vault, Spire)
 docker-compose up -d
 
 # 2. Start Dashboard
 cd webapp && npm install && npm run dev
 
-# 3. Start Core Services
-# (Scripts coming soon for full orchestration)
+# 3. Enable Chaos Engineering (Optional)
+export ENABLE_CHAOS=true
 ```
 
-## Dashboard & Observability
-The Next.js dashboard provides a real-time command center for the entire ecosystem:
-- **Live Trace Explorer**: Visualize distributed tracing (OpenTelemetry) across services.
-- **Global Command Map**: 3D liquidity monitoring across geo-regions.
-- **AI Fraud Investigator**: Natural language behavioral forensics.
-
-## Identity + JWKS
-The platform uses JWTs signed by the internal `identity-service`. Other services verify tokens locally using the identity JWKS endpoint.
-- **WebAuthn/Passkeys**: Biometric authentication supported at `/oauth/authorize`.
-
-Canonical JWKS URL:
-```bash
-export AUTH_JWKS_URL=http://localhost:8084/.well-known/jwks.json
-```
-
-## SPIFFE/SPIRE mTLS
-### Reason (why)
-SPIFFE/SPIRE provides workload identities (SVIDs) so services can authenticate each other using mTLS without distributing long-lived certificates. This supports a Zero Trust posture and prepares the platform for Istio mTLS in Kubernetes.
-
-### Usage (local dev)
-See `docs/spiffe-spire-local-dev.md`.
-
-To enable in-process gRPC mTLS (opt-in):
-```bash
-export SPIFFE_MTLS_ENABLED=true
-export SPIFFE_TRUST_DOMAIN=fincore.local
-export SPIFFE_WORKLOAD_API_ADDR=unix:///run/spire/sockets/agent.sock
-```
-
-Optional allowlists (least-privilege):
-
-```bash
-export SPIFFE_MTLS_CLIENT_ALLOWED_SVIDS=spiffe://fincore.local/ns/default/sa/ledger-service
-export SPIFFE_MTLS_SERVER_ALLOWED_SVIDS=spiffe://fincore.local/ns/default/sa/account-service
-```
+## 📖 Documentation
+- [Security Guidelines](AGENTS.md)
+- [SPIFFE/SPIRE Local Dev](docs/spiffe-spire-local-dev.md)
+- [Roadmap](roadmap.md)
