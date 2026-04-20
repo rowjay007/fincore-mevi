@@ -346,7 +346,7 @@ func oauthTokenErrorFromGRPC(err error) (code string, desc string, httpStatus in
 	}
 }
 
-func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string, pool *pgxpool.Pool) *http.ServeMux {
+func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string, pool *pgxpool.Pool, issuer string) *http.ServeMux {
 	h := http.NewServeMux()
 	h.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -687,6 +687,16 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(jwks)
 	})
+
+	// WebAuthn Handlers
+	wa, err := NewWebAuthnHandler(pool, store, issuer)
+	if err != nil {
+		log.Printf("failed to initialize webauthn: %v", err)
+	} else {
+		h.HandleFunc("/webauthn/login/begin", wa.BeginLogin)
+		h.HandleFunc("/webauthn/login/finish", wa.FinishLogin)
+	}
+
 	return h
 }
 
@@ -924,7 +934,7 @@ func main() {
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
 	}
 
-	h := newHTTPHandler(mux, authClient, cfg, jwks, jwksPath, pool)
+	h := newHTTPHandler(mux, authClient, cfg, jwks, jwksPath, pool, issuer)
 
 	log.Printf("Starting HTTP gateway on %s", httpAddr)
 	if err := http.ListenAndServe(httpAddr, h); err != nil {
