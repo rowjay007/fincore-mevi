@@ -31,6 +31,9 @@ import {
   Filler,
 } from 'chart.js'
 import { Line, Bar } from 'react-chartjs-2'
+import { TraceExplorer } from "@/components/trace-explorer"
+import { GlobalCommandMap } from "@/components/global-map"
+import { AIInvestigator } from "@/components/ai-investigator"
 
 ChartJS.register(
   CategoryScale,
@@ -245,39 +248,19 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-4 shadow-2xl border-border/50">
-          <CardHeader>
-            <CardTitle>Regional Volume (24h)</CardTitle>
-            <CardDescription>Liquidity distribution by region.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full mt-4">
-              <Bar
-                data={regionalData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: {
-                    y: { grid: { display: false }, ticks: { display: false } },
-                    x: { grid: { display: false }, ticks: { color: '#888', font: { size: 10 } } }
-                  }
-                }}
-              />
-            </div>
-            <div className="mt-6 space-y-4">
-              {regionalData.labels.map((label, i) => (
-                <div key={label} className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground font-medium">{label}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold">${regionalData.datasets[0].data[i]}B</span>
-                    <Badge className="bg-emerald-500/10 text-emerald-500 border-none text-[10px]">+2.1%</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-4">
+          <GlobalCommandMap />
+        </div>
+      </div>
+
+      {/* Distributed Tracing Architecture */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8">
+          <TraceExplorer />
+        </div>
+        <div className="lg:col-span-4">
+          <AIInvestigator />
+        </div>
       </div>
 
       {/* Real-time Ingestion Engine */}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -107,6 +108,30 @@ func withRateLimitByPath(defaultLimiter *rateLimiter, strictLimiter *rateLimiter
 			}
 		}
 		withRateLimit(lim, next).ServeHTTP(w, r)
+	})
+}
+
+func withChaos(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only apply chaos if enabled via env or header
+		if os.Getenv("ENABLE_CHAOS") != "true" && r.Header.Get("X-Chaos-Enable") != "true" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// 2% chance of 500 Internal Server Error
+		if rand.Float32() < 0.02 {
+			http.Error(w, "CHAOS_MONKEY: Simulated Network Partition", http.StatusInternalServerError)
+			return
+		}
+
+		// 5% chance of high latency (500ms - 2s)
+		if rand.Float32() < 0.05 {
+			delay := time.Duration(500+rand.Intn(1500)) * time.Millisecond
+			time.Sleep(delay)
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -300,6 +325,7 @@ func main() {
 	strictPrefixes := []string{"/oauth/token", "/v1/auth/login", "/v1/auth/register"}
 
 	h := http.Handler(proxy)
+	h = withChaos(h)
 	h = stripUntrustedIdentityHeaders(h)
 	h = withJWTAuth(verifier, publicPrefixes, h)
 	h = withRateLimitByPath(lim, strict, strictPrefixes, h)
