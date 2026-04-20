@@ -24,7 +24,7 @@ func TestWellKnownEndpoints(t *testing.T) {
 	}
 	jwks := security.JWKS{Keys: []security.JWK{{Kty: "OKP", Crv: "Ed25519", Kid: "kid1", X: "x"}}}
 
-	h := newHTTPHandler(http.NewServeMux(), authv1.AuthServiceClient(nil), cfg, jwks, "/.well-known/jwks.json", nil)
+	h := newHTTPHandler(http.NewServeMux(), authv1.AuthServiceClient(nil), cfg, jwks, "/.well-known/jwks.json", nil, "http://example")
 
 	{
 		req := httptest.NewRequest(http.MethodGet, "http://example/.well-known/openid-configuration", nil)
