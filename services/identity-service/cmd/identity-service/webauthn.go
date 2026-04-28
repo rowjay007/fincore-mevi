@@ -437,3 +437,11 @@ func (h *WebAuthnHandler) FinishRegister(w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *WebAuthnHandler) CleanupSessions(ctx context.Context) (int64, error) {
+	res, err := h.db.Exec(ctx, `delete from webauthn_sessions where expires_at <= now()`)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected(), nil
+}

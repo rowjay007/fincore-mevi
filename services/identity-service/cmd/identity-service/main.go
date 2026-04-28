@@ -346,7 +346,8 @@ func oauthTokenErrorFromGRPC(err error) (code string, desc string, httpStatus in
 	}
 }
 
-func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string, pool *pgxpool.Pool, issuer string) *http.ServeMux {
+func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg openIDConfiguration, jwks security.JWKS, jwksPath string, pool *pgxpool.Pool, issuer string) (http.Handler, *WebAuthnHandler) {
+	store := &browserSessionStore{db: pool, ttl: 24 * time.Hour}
 	h := http.NewServeMux()
 	h.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -367,7 +368,7 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	store := newBrowserSessionStore(pool, 30*time.Minute)
+	store = newBrowserSessionStore(pool, 30*time.Minute)
 	const sessionCookieName = "fincore_authorize_session"
 	const csrfCookieName = "fincore_authorize_csrf"
 	h.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
@@ -699,7 +700,7 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 		h.HandleFunc("/webauthn/register/finish", wa.FinishRegister)
 	}
 
-	return h
+	return h, wa
 }
 
 func getenv(key string) string {
@@ -883,26 +884,6 @@ func main() {
 		}
 	}()
 
-	go func() {
-		t := time.NewTicker(cleanupInterval)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				expired, revoked, err := authgrpc.CleanupRefreshSessions(ctx, pool, revokedRetention)
-				if err != nil {
-					log.Printf("refresh session cleanup error: %v", err)
-					continue
-				}
-				if expired != 0 || revoked != 0 {
-					log.Printf("refresh session cleanup deleted: expired=%d revoked=%d", expired, revoked)
-				}
-			}
-		}
-	}()
-
 	mux := runtime.NewServeMux(middleware.GatewayAuthHeaderForwarder())
 	var dialCreds credentials.TransportCredentials = insecure.NewCredentials()
 	if creds, closeSrc, err := security.NewSpiffeMTLSClientCredentials(ctx); err == nil {
@@ -936,7 +917,32 @@ func main() {
 		IDTokenSigningAlgValuesSupported: []string{"EdDSA"},
 	}
 
-	h := newHTTPHandler(mux, authClient, cfg, jwks, jwksPath, pool, issuer)
+	h, wa := newHTTPHandler(mux, authClient, cfg, jwks, jwksPath, pool, issuer)
+
+	go func() {
+		t := time.NewTicker(cleanupInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				expired, revoked, err := authgrpc.CleanupRefreshSessions(ctx, pool, revokedRetention)
+				if err != nil {
+					log.Printf("refresh session cleanup error: %v", err)
+					continue
+				}
+				if expired != 0 || revoked != 0 {
+					log.Printf("refresh session cleanup deleted: expired=%d revoked=%d", expired, revoked)
+				}
+				if wa != nil {
+					if deleted, err := wa.CleanupSessions(ctx); err == nil && deleted > 0 {
+						log.Printf("webauthn session cleanup deleted: %d expired challenges", deleted)
+					}
+				}
+			}
+		}
+	}()
 
 	log.Printf("Starting HTTP gateway on %s", httpAddr)
 	if err := http.ListenAndServe(httpAddr, h); err != nil {
