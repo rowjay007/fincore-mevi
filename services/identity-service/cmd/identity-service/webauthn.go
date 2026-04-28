@@ -445,3 +445,86 @@ func (h *WebAuthnHandler) CleanupSessions(ctx context.Context) (int64, error) {
 	}
 	return res.RowsAffected(), nil
 }
+
+type webAuthnCredentialInfo struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	SignCount int64     `json:"sign_count"`
+}
+
+func (h *WebAuthnHandler) ListCredentials(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	c, err := r.Cookie("fincore_authorize_session")
+	if err != nil || strings.TrimSpace(c.Value) == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	sess, ok := h.session.get(ctx, strings.TrimSpace(c.Value))
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.db.Query(ctx, `
+		select id, sign_count, created_at, updated_at
+		from webauthn_credentials
+		where user_id = $1
+		order by created_at desc
+	`, sess.UserID)
+	if err != nil {
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var out []webAuthnCredentialInfo
+	for rows.Next() {
+		var info webAuthnCredentialInfo
+		if err := rows.Scan(&info.ID, &info.SignCount, &info.CreatedAt, &info.UpdatedAt); err != nil {
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+		out = append(out, info)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+func (h *WebAuthnHandler) DeleteCredential(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+
+	c, err := r.Cookie("fincore_authorize_session")
+	if err != nil || strings.TrimSpace(c.Value) == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	sess, ok := h.session.get(ctx, strings.TrimSpace(c.Value))
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	res, err := h.db.Exec(ctx, `delete from webauthn_credentials where id = $1 and user_id = $2`, id, sess.UserID)
+	if err != nil {
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	if res.RowsAffected() == 0 {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

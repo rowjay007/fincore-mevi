@@ -698,6 +698,8 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 		h.HandleFunc("/webauthn/login/finish", wa.FinishLogin)
 		h.HandleFunc("/webauthn/register/begin", wa.BeginRegister)
 		h.HandleFunc("/webauthn/register/finish", wa.FinishRegister)
+		h.HandleFunc("/webauthn/credentials", wa.ListCredentials)
+		h.HandleFunc("/webauthn/credentials/delete", wa.DeleteCredential)
 	}
 
 	return h, wa
