@@ -1,0 +1,44 @@
+replicaCount: 2
+
+image:
+  repository: fincore/service
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 8080
+  grpcPort: 50051
+
+env: {}
+# Example:
+# IDENTITY_DB_DSN: "..."
+
+# Vault integration via Agent Sidecar or CSI provider
+vault:
+  enabled: true
+  role: "fincore-service"
+  secretPath: "secret/data/service"
+
+# SPIRE integration for mTLS
+spire:
+  enabled: true
+  agentSocketPath: "/run/spire/sockets/agent.sock"
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
