@@ -34,20 +34,9 @@ We structured the codebase as a 12-service monorepo. The argument for independen
 By keeping services like `identity-service`, `auth-service`, and `ledger-service` in a single monorepo, we were able to enforce strict, shared security primitives. When we updated our `TokenMaker` interface in `pkg/security`, the change propagated across the entire system. 
 
 ```go
-// @/Users/rowjay/DEV/fincore-mevi/pkg/security/token.go
-// TokenMaker is an interface for managing JSON Web Tokens (JWT).
-// It abstracts the underlying signing algorithm (Ed25519 in our case)
-// from the rest of the application.
 type TokenMaker interface {
-    // CreateToken creates a new token for a specific username and duration.
-    // We use a custom TokenPayload struct to ensure consistent claims
-    // across all services (sub, iat, exp, and custom scopes).
-    CreateToken(payload TokenPayload) (string, error)
-
-    // VerifyToken checks if the token is valid or not.
-    // It must handle expiration, signature verification, and 
-    // algorithm enforcement (preventing "none" alg attacks).
-    VerifyToken(token string) (*TokenPayload, error)
+	CreateToken(payload TokenPayload) (string, error)
+	VerifyToken(token string) (*TokenPayload, error)
 }
 ```
 
@@ -71,21 +60,17 @@ Attestation is the process of proving identity through environmental evidence. F
 This integration is handled seamlessly in our Helm charts, offloading the complexity from the developer to the platform. By the time the Go application starts, the certificates are already available on a local Unix socket.
 
 ```yaml
-// @/Users/rowjay/DEV/fincore-mevi/deploy/charts/fincore-service/templates/deployment.yaml
     spec:
       template:
         metadata:
           labels:
             {{- include "fincore-service.selectorLabels" . | nindent 8 }}
             {{- if .Values.spire.enabled }}
-            # This label triggers the SPIRE admission controller to inject
-            # the CSI driver volume for the agent socket.
             spiffe.io/spiffe-id: "true"
             {{- end }}
       spec:
         containers:
           - name: {{ .Chart.Name }}
-            # ... image and env config ...
             {{- if .Values.spire.enabled }}
             volumeMounts:
               - name: spire-agent-socket
@@ -118,10 +103,6 @@ Consider the tradeoff we made here: throughput vs. provability. Appending to a M
 Our dashboard provides a real-time view into this integrity layer:
 
 ```typescript
-// @/Users/rowjay/DEV/fincore-mevi/webapp/src/app/page.tsx
-// This component monitors the Merkle Root Hash from the audit-service.
-// Any change in historical data would cause this hash to deviate
-// from the expected value, triggering a security alert.
 <Card className="bg-gradient-to-br from-card to-background border-l-4 border-l-red-500 shadow-xl">
   <CardHeader className="pb-2">
     <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Audit Root Hash</CardTitle>
@@ -150,10 +131,6 @@ In our implementation of the `identity-service`, we chose to build a custom pers
 We created a two-table system. The `webauthn_credentials` table stores the long-lived public keys, while the `webauthn_sessions` table stores the short-lived, one-time challenges. We chose PostgreSQL for this because of its robust JSONB support, which allows us to store the complex `webauthn.SessionData` and `webauthn.Credential` objects without flattening them into a thousand fragile columns.
 
 ```go
-// @/Users/rowjay/DEV/fincore-mevi/services/identity-service/cmd/identity-service/webauthn.go
-// ensureWebAuthnTables creates the schema required for production-grade Passkey support.
-// We use JSONB for the 'credential' and 'session_data' to maintain compatibility
-// with the evolving WebAuthn spec without frequent schema migrations.
 func ensureWebAuthnTables(ctx context.Context, db *pgxpool.Pool) error {
 	_, err := db.Exec(ctx, `
 		create table if not exists webauthn_credentials (
@@ -167,7 +144,7 @@ func ensureWebAuthnTables(ctx context.Context, db *pgxpool.Pool) error {
 		);
 		create table if not exists webauthn_sessions (
 		  id text primary key,
-		  kind text not null, -- 'login' or 'register'
+		  kind text not null,
 		  user_id text not null references auth_users(id) on delete cascade,
 		  session_data jsonb not null,
 		  expires_at timestamptz not null,
@@ -207,9 +184,6 @@ The final piece of the FinCore puzzle was the "Golden Path" to deployment. An en
 In many organizations, "Ops" is a separate silo that engineers throw code over. We integrated Ops directly into the codebase. Our Terraform configuration in `deploy/terraform/vault/main.tf` doesn't just "create a Vault"; it configures the entire security policy of the bank. It sets up the Kubernetes auth methods, the KV-V2 engines, and the per-service RBAC policies.
 
 ```hcl
-// @/Users/rowjay/DEV/fincore-mevi/deploy/terraform/vault/main.tf
-# Define a strict policy for the identity-service.
-# It can only read its own secrets and cannot list other paths.
 resource "vault_policy" "identity_service" {
   name   = "identity-service"
   policy = <<EOT
@@ -219,8 +193,6 @@ path "secret/data/identity" {
 EOT
 }
 
-# Bind the Vault role to the Kubernetes Service Account.
-# This is the "Identity Bridge" that enables zero-trust secret access.
 resource "vault_kubernetes_auth_backend_role" "identity_service" {
   backend                          = vault_auth_backend.kubernetes.path
   role_name                        = "identity-service"
@@ -268,18 +240,68 @@ Most developers try to solve this by wrapping the DB update and the message send
 We solved this using the **Transactional Outbox Pattern**. In FinCore, we never send a message directly from the domain service. Instead, we write the message to a special `outbox` table in the *same* database transaction as the domain change. 
 
 ```go
-// @/pkg/outbox/postgres/outbox.go
-// PostMessage inserts a message into the outbox table within an existing transaction.
-func (s *OutboxStore) PostMessage(ctx context.Context, tx pgx.Tx, msg outbox.Message) error {
-    _, err := tx.Exec(ctx, `
-        insert into outbox (id, topic, payload, state, created_at)
-        values ($1, $2, $3, 'PENDING', now())
-    `, msg.ID, msg.Topic, msg.Payload)
-    return err
+func (s *Store) Enqueue(ctx context.Context, msg outbox.Message) error {
+	_, err := s.q.Exec(ctx, `insert into outbox_messages(
+		id, topic, key, value, headers
+	) values ($1,$2,$3,$4,$5)`, msg.ID, msg.Topic, msg.Key, msg.Value, msg.Headers)
+	return err
 }
 ```
 
-A separate, dedicated "Relay" process—the `@/pkg/outbox/relay`—polls this table, sends the messages to the broker, and marks them as `PROCESSED`. If the relay crashes, it simply picks up where it left off. This guarantees "At-Least-Once" delivery without the complexity of Two-Phase Commit (2PC) protocols.
+A separate, dedicated "Relay" process—the `@/pkg/outbox/relay`—polls this table, sends the messages to the broker, and marks them as `PROCESSED`.
+
+```go
+func (r *Relay) tick(ctx context.Context, cfg relay.Config) error {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	rows, err := tx.Query(ctx, `select id, topic, key, value, headers
+		from outbox_messages
+		where published_at is null
+		order by created_at asc
+		limit $1
+		for update skip locked`, cfg.BatchSize)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var batch []row
+	for rows.Next() {
+		var rrow row
+		var headersJSON []byte
+		if err := rows.Scan(&rrow.id, &rrow.topic, &rrow.key, &rrow.value, &headersJSON); err != nil {
+			return err
+		}
+		if len(headersJSON) > 0 {
+			_ = json.Unmarshal(headersJSON, &rrow.headers)
+		}
+		batch = append(batch, rrow)
+	}
+
+	for _, m := range batch {
+		pctx, cancel := context.WithTimeout(ctx, cfg.PublishTimeout)
+		err := r.publisher.Publish(pctx, m.topic, m.key, m.value, m.headers)
+		cancel()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `update outbox_messages set published_at = $1 where id = $2`, time.Now().UTC(), m.id)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+```
+
+If the relay crashes, it simply picks up where it left off. This guarantees "At-Least-Once" delivery without the complexity of Two-Phase Commit (2PC) protocols.
 
 ### Idempotency: The Final Defense
 Since we use "At-Least-Once" delivery, the downstream consumer (e.g., the `@/services/notification-service`) might receive the same message twice. To handle this, we implemented **Idempotency Keys**. Every command in FinCore carries a unique ID. If a service receives a command with an ID it has already processed, it simply returns the previous result without performing the action again. 
@@ -465,14 +487,10 @@ In a bank, a phantom read is a regulatory nightmare. It means your end-of-day ba
 PostgreSQL's implementation of `SERIALIZABLE` isolation is based on **Serializable Snapshot Isolation (SSI)**. Unlike traditional locking mechanisms that block other transactions, SSI allows them to run concurrently but "tracks" the dependencies between them. If the database detects that a set of concurrent transactions *could* result in an inconsistent state, it will proactively abort one of them.
 
 ```go
-// @/pkg/db/postgres/tx.go
-// WithSerializableTransaction executes a function within a SERIALIZABLE transaction.
-// It includes the necessary retry logic for 'serialization_failure' (40001) errors,
-// which are expected in a high-concurrency SSI environment.
 func (db *DB) WithSerializableTransaction(ctx context.Context, fn func(pgx.Tx) error) error {
-    return db.retryOnSerializationFailure(func() error {
-        return pgx.BeginFunc(ctx, db.Pool, pgx.TxOptions{IsoLevel: pgx.Serializable}, fn)
-    })
+	return db.retryOnSerializationFailure(func() error {
+		return pgx.BeginFunc(ctx, db.Pool, pgx.TxOptions{IsoLevel: pgx.Serializable}, fn)
+	})
 }
 ```
 
@@ -600,12 +618,23 @@ In a distributed system, a "Running" process is not necessarily a "Healthy" proc
 
 ### Deep Health Checks
 We implemented **Deep Health Checks** across all 12 services. A FinCore health check doesn't just return a `200 OK`. It performs a "ping" on all its dependencies:
-1.  **Database Connection**: Can it execute a simple `SELECT 1`?
-2.  **Vault Lease**: Is its token still valid?
-3.  **gRPC Peers**: Can it talk to its upstream and downstream neighbors?
-
-If any of these dependencies fail, the service marks itself as "Unready." Kubernetes then automatically stops sending traffic to it and, if the failure persists, restarts the pod. This "Self-Healing" behavior is what allows the bank to survive transient network blips and database failovers without manual intervention.
-
+```go
+h.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+	if pool == nil {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if err := pool.Ping(ctx); err != nil {
+		http.Error(w, "not ready", http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
+})
+```
 ### The 'Zombies' and the 'Hanging' Problem
 We also implemented a **Zombie Detection** mechanism in our gRPC middleware. If a request has been running for more than 2x its deadline without any progress, the middleware forcefully terminates the request and emits a "Stalled Request" metric. This prevents a single hanging request from "leaking" resources and eventually crashing the entire service. We moved from "passive monitoring" to "active defense."
 
