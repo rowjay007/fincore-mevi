@@ -695,6 +695,8 @@ func newHTTPHandler(gw http.Handler, authClient authv1.AuthServiceClient, cfg op
 	} else {
 		h.HandleFunc("/webauthn/login/begin", wa.BeginLogin)
 		h.HandleFunc("/webauthn/login/finish", wa.FinishLogin)
+		h.HandleFunc("/webauthn/register/begin", wa.BeginRegister)
+		h.HandleFunc("/webauthn/register/finish", wa.FinishRegister)
 	}
 
 	return h
