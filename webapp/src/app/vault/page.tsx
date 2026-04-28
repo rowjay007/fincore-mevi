@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Lock, ShieldCheck, Key, Eye } from "lucide-react"
 import { useEffect, useState } from "react"
+import { PasskeyManager } from "@/components/passkey-manager"
 
 export default function VaultPage() {
   const [mounted, setMounted] = useState(false)
@@ -100,6 +101,10 @@ export default function VaultPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-6">
+        <PasskeyManager />
+      </div>
     </div>
   )
 }

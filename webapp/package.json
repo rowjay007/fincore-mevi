@@ -11,6 +11,7 @@
   "dependencies": {
     "@faker-js/faker": "^10.4.0",
     "@passwordless-id/webauthn": "^2.3.5",
+    "@simplewebauthn/browser": "^13.3.0",
     "@tanstack/react-query": "^5.99.0",
     "@tanstack/react-table": "^8.21.3",
     "@types/chart.js": "^2.9.41",
