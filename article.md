@@ -1,12 +1,12 @@
 # The Architecture of Certainty: Engineering a Multi-Region Banking Core from the Ground Up
 
-The first time I saw a distributed system fail in a way that actually mattered, it wasn't a spectacular crash. There were no sirens, no cascading 500 errors, and no immediate panic. It was a single ledger entry in a settlement service that simply... wasn't there. A message had been "successfully" acknowledged by a broker, a database transaction had committed, and a client had received a 200 OK. But 800 milliseconds later, in a datacenter three thousand miles away, the state of the world diverged. We had built a system that optimized for the "happy path" of local consistency and lost the war against entropy.
+The first time I saw a distributed system fail in a way that actually mattered, it wasn't a spectacular crash. There were no sirens, no cascading 500 errors, and no immediate panic. It was a single ledger entry in a settlement service that simply... wasn't there. A message had been "successfully" acknowledged by a broker, a database transaction had committed, and a client had received a 200 OK. But 800 milliseconds later, in a datacenter three thousand miles away, the state of the world diverged. A system had been built that optimized for the "happy path" of local consistency and lost the war against entropy.
 
-FinCore was born from the scar tissue of those failures. When we set out to build this banking core, we didn't start with a feature list; we started with a threat model. We assumed the network was malicious, the infrastructure was ephemeral, and the developers (including ourselves) were prone to the kind of "optimistic concurrency" that leads to financial ruin. This is the account of how we engineered a system designed to survive the messy reality of global finance—a deep dive into the code, the tradeoffs, and the architectural philosophy of a platform that treats "certainty" as its primary primitive.
+The Architecture of Certainty was born from the scar tissue of those failures. When setting out to build this banking core, the project didn't start with a feature list; it started with a threat model. We assumed the network was malicious, the infrastructure was ephemeral, and the developers (including ourselves) were prone to the kind of "optimistic concurrency" that leads to financial ruin. This is the account of how a system was engineered to survive the messy reality of global finance—a deep dive into the code, the tradeoffs, and the architectural philosophy of a platform that treats "certainty" as its primary primitive.
 
 ## The Ghost in the Machine: Why We Stopped Trusting the Network
 
-In the early days of FinCore, we faced a fundamental fork in the road: do we build for performance, or do we build for certainty? In banking, "performance" is a siren song. It leads you toward asynchronous fire-and-forget patterns and eventually, toward the graveyard of eventual consistency. But a bank that is eventually consistent is just a very fast way to lose money. 
+In the early days of this architecture, a fundamental fork in the road appeared: do we build for performance, or do we build for certainty? In banking, "performance" is a siren song. It leads toward asynchronous fire-and-forget patterns and eventually, toward the graveyard of eventual consistency. But a bank that is eventually consistent is just a very fast way to lose money. 
 
 ### The Lessons of 2012: From Knight Capital to Today
 Consider the infamous Knight Capital incident of 2012, where a dormant codebase and a failed deployment led to $440 million in losses in just 45 minutes. The root cause wasn't just a bug; it was a lack of systemic observability and an over-reliance on the network behaving as expected. We took this as a foundational warning. In today's "cloud-native" world, the fallacies of distributed computing—that the network is reliable, that latency is zero, and that bandwidth is infinite—are more dangerous than ever because they are masked by the convenience of managed services.
@@ -23,7 +23,7 @@ In the parlance of the CAP theorem (Consistency, Availability, Partition Toleran
 
 ## The Fork in the Road: Hexagonal Pragmatism vs. Microservice Sprawl
 
-The industry has a tendency to treat microservices as a goal rather than a tool. We’ve all seen the "Death Star" diagrams of thousands of services with no clear owner and a dependency graph that looks like a bowl of overcooked spaghetti. For FinCore, we opted for what I call "Hexagonal Pragmatism." 
+The industry has a tendency to treat microservices as a goal rather than a tool. We’ve all seen the "Death Star" diagrams of thousands of services with no clear owner and a dependency graph that looks like a bowl of overcooked spaghetti. For this core, we opted for what is called "Hexagonal Pragmatism." 
 
 ### Beyond Ports and Adapters
 Hexagonal architecture (or Ports and Adapters) is often dismissed as academic over-engineering. But in a multi-region environment where you might need to swap a PostgreSQL adapter for a Spanner adapter, or a Kafka outbox for a NATS JetStream outbox, it is the only way to maintain sanity. By decoupling our domain logic—the "pure" rules of banking—from the "messy" reality of infrastructure, we created a system that is as easy to test as it is to deploy.
@@ -47,13 +47,13 @@ This structural decision allowed us to treat the entire bank as a single, cohesi
 The most common failure point in enterprise security is the "Hardcoded Secret." Whether it’s a database password in a YAML file or an API key in an environment variable, these secrets are static, they leak, and they are a nightmare to rotate. If an attacker gains access to a single pod, they often find the "keys to the kingdom" sitting in plain text in the environment.
 
 ### SPIFFE/SPIRE: The Identity of Workloads
-For FinCore, we implemented **SPIRE (the Software PRovider for IntertHree REal-time)**. We moved away from the idea of "what you know" (passwords) and toward "who you are" (attested identity). Every service in the FinCore ecosystem receives a SPIFFE ID—a unique, cryptographically verifiable URI that serves as its "passport."
+For this architecture, **SPIRE (the Software PRovider for IntertHree REal-time)** was implemented. We moved away from the idea of "what you know" (passwords) and toward "who you are" (attested identity). Every service in the ecosystem receives a SPIFFE ID—a unique, cryptographically verifiable URI that serves as its "passport."
 
 When the `ledger-service` wants to talk to the database or the `audit-service`, it doesn't use a password. It presents a short-lived SVID (SPIFFE Verifiable Identity Document). This is essentially an mTLS certificate that is rotated every hour. The SPIRE server only issues this document after "attesting" the workload. 
 
 ### The Mechanics of Attestation
 Attestation is the process of proving identity through environmental evidence. For a pod in Kubernetes, the SPIRE agent verifies:
-1.  **The Namespace**: Is it running in the `fincore` namespace?
+1.  **The Namespace**: Is it running in the designated system namespace?
 2.  **The Service Account**: Is it using the authorized `identity-service` account?
 3.  **The Binary Hash**: Does the running binary match the expected SHA-256 hash?
 
@@ -64,7 +64,7 @@ This integration is handled seamlessly in our Helm charts, offloading the comple
       template:
         metadata:
           labels:
-            {{- include "fincore-service.selectorLabels" . | nindent 8 }}
+            {{- include "service.selectorLabels" . | nindent 8 }}
             {{- if .Values.spire.enabled }}
             spiffe.io/spiffe-id: "true"
             {{- end }}
@@ -179,7 +179,7 @@ Chaos engineering is useless if you can't see the results. We integrated our fai
 
 ## The Bank in a Box: Orchestrating the "Golden Path"
 
-The final piece of the FinCore puzzle was the "Golden Path" to deployment. An engineer should be able to spin up a fully compliant, zero-trust banking environment in minutes, not weeks. 
+The final piece of the puzzle was the "Golden Path" to deployment. An engineer should be able to spin up a fully compliant, zero-trust banking environment in minutes, not weeks. 
 
 In many organizations, "Ops" is a separate silo that engineers throw code over. We integrated Ops directly into the codebase. Our Terraform configuration in `deploy/terraform/vault/main.tf` doesn't just "create a Vault"; it configures the entire security policy of the bank. It sets up the Kubernetes auth methods, the KV-V2 engines, and the per-service RBAC policies.
 
@@ -197,7 +197,7 @@ resource "vault_kubernetes_auth_backend_role" "identity_service" {
   backend                          = vault_auth_backend.kubernetes.path
   role_name                        = "identity-service"
   bound_service_account_names      = ["identity-service"]
-  bound_service_account_namespaces = ["fincore"]
+  bound_service_account_namespaces = ["production"]
   token_policies                   = ["identity-service"]
   token_ttl                        = 3600
 }
@@ -209,13 +209,13 @@ We found that having the "How-To" for a secret rotation sitting right next to th
 
 ## Retrospective: What Survived the First Million Transactions
 
-Building FinCore was an exercise in resisting the temptation of the easy path. It would have been easier to use passwords. It would have been easier to use a single SQL database. It would have been easier to skip the chaos engineering.
+Building this architecture was an exercise in resisting the temptation of the easy path. It would have been easier to use passwords. It would have been easier to use a single SQL database. It would have been easier to skip the chaos engineering.
 
-But as the system scaled past its first million transactions, the value of those "hard" decisions became clear. When we had a database primary failure in the EU region, the SPIFFE mTLS identities allowed the secondary to take over without a single person needing to update a password. When a localized network partition occurred, the Merkle Hash Chain allowed us to prove to regulators that no data had been lost or tampered with during the "grey failure."
+But as the system scaled past its first million transactions, the value of those "hard" decisions became clear. When a database primary failure occurred in the EU region, the SPIFFE mTLS identities allowed the secondary to take over without a single person needing to update a password. When a localized network partition occurred, the Merkle Hash Chain allowed regulators to be shown proof that no data had been lost or tampered with during the "grey failure."
 
 ## The Heart of the Domain: DDD and the CQRS Pattern
 
-In a system where every cent must be accounted for, the "Generic CRUD" approach is a liability. For FinCore, we implemented Domain-Driven Design (DDD) coupled with Command Query Responsibility Segregation (CQRS). This isn't just about separating reads from writes; it's about separating the *intent* of the user from the *state* of the database.
+In a system where every cent must be accounted for, the "Generic CRUD" approach is a liability. For this architecture, Domain-Driven Design (DDD) coupled with Command Query Responsibility Segregation (CQRS) was implemented. This isn't just about separating reads from writes; it's about separating the *intent* of the user from the *state* of the database.
 
 ### Aggregates and Invariants
 In our `@/services/ledger-service`, we treat an `Account` as a DDD Aggregate. An aggregate is a cluster of domain objects that can be treated as a single unit. Any change to the account—a deposit, a withdrawal, or a hold—must pass through the aggregate's "Guard" logic. 
@@ -237,7 +237,7 @@ One of the most difficult problems in distributed systems is ensuring that a dat
 ### The Dual-Write Problem
 Most developers try to solve this by wrapping the DB update and the message send in a single Go function. This is a "Distributed Transaction," and it is notoriously unreliable. 
 
-We solved this using the **Transactional Outbox Pattern**. In FinCore, we never send a message directly from the domain service. Instead, we write the message to a special `outbox` table in the *same* database transaction as the domain change. 
+We solved this using the **Transactional Outbox Pattern**. In this design, a message is never sent directly from the domain service. Instead, the message is written to a special `outbox` table in the *same* database transaction as the domain change. 
 
 ```go
 func (s *Store) Enqueue(ctx context.Context, msg outbox.Message) error {
@@ -304,9 +304,9 @@ func (r *Relay) tick(ctx context.Context, cfg relay.Config) error {
 If the relay crashes, it simply picks up where it left off. This guarantees "At-Least-Once" delivery without the complexity of Two-Phase Commit (2PC) protocols.
 
 ### Idempotency: The Final Defense
-Since we use "At-Least-Once" delivery, the downstream consumer (e.g., the `@/services/notification-service`) might receive the same message twice. To handle this, we implemented **Idempotency Keys**. Every command in FinCore carries a unique ID. If a service receives a command with an ID it has already processed, it simply returns the previous result without performing the action again. 
+Since "At-Least-Once" delivery is used, the downstream consumer (e.g., the `@/services/notification-service`) might receive the same message twice. To handle this, **Idempotency Keys** were implemented. Every command carries a unique ID. If a service receives a command with an ID it has already processed, it simply returns the previous result without performing the action again. 
 
-This combination of DDD, CQRS, and the Transactional Outbox creates what we call the "Durable Domain"—a system that can be paused, restarted, or partitioned without ever losing a single unit of state.
+This combination of DDD, CQRS, and the Transactional Outbox creates what is called the "Durable Domain"—a system that can be paused, restarted, or partitioned without ever losing a single unit of state.
 
 ## The Latency Gap: Optimizing the gRPC Backbone
 
@@ -327,7 +327,7 @@ When a request enters the `@/services/api-gateway`, it is assigned a context wit
 In a traditional database-centric system, the current state of an account is all that exists. You have a `balance` column, and you update it. But in a high-stakes banking environment, the *current* state is merely a derived view. The ultimate truth is the sequence of events that led to that state. This is why for the `@/services/ledger-service`, we chose **Event Sourcing**.
 
 ### The Anatomy of an Event
-Every transaction in FinCore is stored as a series of immutable events: `TransactionInitiated`, `FundsReserved`, `AccountDebited`, `AccountCredited`. We never delete or update these events. If a mistake is made, we don't "fix" the row; we emit a `CorrectionEvent` that offsets the previous entry. This provides an audit trail that is naturally compliant with regulations like GDPR and Sarbanes-Oxley.
+Every transaction is stored as a series of immutable events: `TransactionInitiated`, `FundsReserved`, `AccountDebited`, `AccountCredited`. These events are never deleted or updated. If a mistake is made, the row is not "fixed"; instead, a `CorrectionEvent` is emitted that offsets the previous entry. This provides an audit trail that is naturally compliant with regulations like GDPR and Sarbanes-Oxley.
 
 The challenge with Event Sourcing is "Replay Latency." If an account has ten million transactions, calculating the current balance by replaying all events from day one is too slow. We solved this using **Snapshots**. Every 100 events, we save a point-in-time state of the aggregate. To get the current balance, we load the latest snapshot and only replay the events that happened after it.
 
@@ -382,7 +382,7 @@ When things go wrong—and they will—we conduct blameless post-mortems. We don
 In a high-stakes banking environment, "Infrastructure" is not a static place where code lives; it is a dynamic extension of the code itself. We moved away from the traditional "Ops" model toward **Platform Engineering**, where the infrastructure is treated with the same rigor, versioning, and testing as the domain logic.
 
 ### Unified Orchestration via Helm
-For FinCore, we developed a generic but highly configurable Helm chart at `@/deploy/charts/fincore-service`. This chart isn't just a deployment manifest; it is a "System Policy" in YAML. It enforces horizontal autoscaling (HPA), configures the SPIRE agent sidecars, and injects Vault secrets. 
+A generic but highly configurable Helm chart was developed for service orchestration. This chart isn't just a deployment manifest; it is a "System Policy" in YAML. It enforces horizontal autoscaling (HPA), configures the SPIRE agent sidecars, and injects Vault secrets. 
 
 The decision to use a single "Golden Chart" was a deliberate choice to trade individual service flexibility for systemic reliability. If we need to patch a security vulnerability in our mTLS configuration, we update the Golden Chart and trigger a rolling update across all 12 services. This ensures that the security posture of the `@/services/identity-service` is identical to that of the `@/services/ledger-service`.
 
@@ -408,7 +408,7 @@ If the Risk Score is above a certain threshold (e.g., 0.85), the `identity-servi
 Transacting money requires ACID compliance (PostgreSQL). Analyzing money requires massive parallel processing (OLAP). We observed that many banking cores fail because they try to perform both on the same database.
 
 ### The Projection Engine
-In FinCore, the transaction records in PostgreSQL are ephemeral—they are optimized for the next 24 hours of operation. For long-term analytical queries, we project these records into **ClickHouse** via our `@/services/reporting-service`.
+In this architecture, the transaction records in PostgreSQL are ephemeral—they are optimized for the next 24 hours of operation. For long-term analytical queries, these records are projected into **ClickHouse** via the `@/services/reporting-service`.
 
 ClickHouse allows us to perform "Full-Table Scans" across billions of records in seconds. This is critical for **Anti-Money Laundering (AML)** monitoring and regulatory reporting. Our projections are "Eventually Consistent," typically lagging the primary ledger by less than 500ms. 
 
@@ -420,7 +420,7 @@ We use ClickHouse Materialized Views to calculate real-time aggregates like "Tot
 In a high-throughput banking system, the most significant bottleneck is rarely the network or the CPU; it is database contention on "Hot Accounts." Consider a corporate payroll account or a government disbursement fund that processes ten thousand outgoing transfers per second. In a standard ACID database, every transfer requires a row-level lock on the sender's balance. This creates a serialized queue that effectively caps your throughput at the disk I/O latency of a single row update.
 
 ### The Batch-and-Merge Strategy
-To solve this in FinCore, we implemented a **LMAX Disruptor-inspired** batching layer in the `@/services/ledger-service`. Instead of updating the database for every individual request, we buffer transaction intent in a high-speed, lock-free memory ring buffer. 
+To solve this, a **LMAX Disruptor-inspired** batching layer was implemented in the `@/services/ledger-service`. Instead of updating the database for every individual request, transaction intent is buffered in a high-speed, lock-free memory ring buffer. 
 
 Every 10ms (or every 5,000 transactions), a dedicated "Sequencer" thread pulls the batch, calculates the net impact on each account, and performs a single, multi-row atomic update in PostgreSQL. This moves the bottleneck from row-level locking to the sequential throughput of the WAL (Write-Ahead Log), allowing us to scale our TPS (Transactions Per Second) by two orders of magnitude without sacrificing consistency.
 
@@ -429,17 +429,14 @@ For accounts that are not "hot," we use **Optimistic Concurrency Control (OCC)**
 
 If another transaction updated the account in the interim, the version check fails, and the service retries the operation with a jittered backoff. This ensures that we only pay the performance cost of heavy locking (the Sequencer) when the account's activity justifies it, maintaining a fluid and responsive core for the vast majority of retail users.
 
-## The Quantum Leap: Post-Quantum Security in Financial Transit
-
-As we engineered the `@/pkg/security` layer, we had to look beyond the immediate threat landscape. The emergence of Shor’s algorithm and the theoretical potential of Cryptographically Relevant Quantum Computers (CRQC) means that the Ed25519 and RSA signatures we rely on today have an expiration date. 
 
 ### The Hybrid Signature Approach
-We didn't just "wait" for the standards to finalize. We implemented a **Hybrid Signature Mode** for our internal mTLS and token issuance. Every signed artifact in FinCore can optionally carry two signatures: one from a classical Ed25519 key and one from a NIST-candidate Post-Quantum algorithm like **Falcon** or **Dilithium**.
+A **Hybrid Signature Mode** has been implemented for internal mTLS and token issuance. Every signed artifact can optionally carry two signatures: one from a classical Ed25519 key and one from a NIST-candidate Post-Quantum algorithm like **Falcon** or **Dilithium**.
 
-By verifying both signatures, we ensure that the system remains secure today (against classical attacks) and tomorrow (against future quantum adversaries). This "Defense-in-Time" strategy is critical for a banking core that expects to store data that must remain confidential and immutable for thirty years or more.
+By verifying both signatures, the system remains secure today (against classical attacks) and tomorrow (against future quantum adversaries). This "Defense-in-Time" strategy is critical for a banking core that expects to store data that must remain confidential and immutable for thirty years or more.
 
 ### Zero-Knowledge Proofs for Privacy-Preserving Audits
-A recurring tension in banking is between **Auditability** (the regulator needs to see everything) and **Privacy** (the customer shouldn't have their data leaked). We are currently experimenting with **Zero-Knowledge Proofs (ZKPs)** within our `@/services/audit-service`. 
+A recurring tension in banking is between **Auditability** (the regulator needs to see everything) and **Privacy** (the customer shouldn't have their data leaked). **Zero-Knowledge Proofs (ZKPs)** are being experimented with within the `@/services/audit-service`. 
 
 Using ZKPs, we can allow an external auditor to verify that "All transactions in Block X are valid and sum to Zero" without actually revealing the specific account IDs or amounts involved in those transactions. This moves the audit model from "Trust the Data" to "Verify the Proof," creating a new standard for privacy in the financial sector.
 
@@ -462,15 +459,15 @@ When a regional failure is detected, the `@/services/identity-service` and `@/se
 As a Distinguished Engineer, you realize that the most complex component of any system is the human operator. You can build the most resilient gRPC backbone in the world, but if a tired engineer runs a `DELETE` without a `WHERE` clause in production, the system will fail.
 
 ### Runbooks as a First-Class Language
-In FinCore, we treated our **Runbooks** with the same rigor as our Go code. Every runbook in the `docs/runbooks` directory is:
+Runbooks** were treated with the same rigor as Go code. Every runbook in the `docs/runbooks` directory is:
 1.  **Version Controlled**: Changes must go through a Pull Request and be reviewed by another engineer.
 2.  **Idempotent**: Running the same runbook twice should be safe and result in the same state.
-3.  **Automated via CLI**: We developed a `fincore-ops` CLI tool that executes the steps of a runbook, reducing the "Fat Finger" risk during an emergency.
+3.  **Automated via CLI**: A CLI tool was developed that executes the steps of a runbook, reducing the "Fat Finger" risk during an emergency.
 
 We found that by treating operational procedures as code, we reduced our "Mean Time To Repair" (MTTR) by 70%. The goal isn't just to fix the problem; it's to fix the problem in a way that is repeatable and verifiable.
 
 ### The Art of the Post-Mortem
-A failure in FinCore is not a cause for blame; it is a gift of information. Every outage, regardless of size, results in a **Blameless Post-Mortem**. We use the "Five Whys" technique to dig past the immediate symptom (e.g., "The database was slow") to the root cause (e.g., "The connection pool logic was missing a context deadline"). 
+A failure is not a cause for blame; it is a gift of information. Every outage, regardless of size, results in a **Blameless Post-Mortem**. The "Five Whys" technique is used to dig past the immediate symptom (e.g., "The database was slow") to the root cause (e.g., "The connection pool logic was missing a context deadline"). 
 
 This culture of psychological safety is what allows us to continuously improve. It is the reason we built the chaos engine into the gateway—because our engineers were honest about the fact that they didn't know how the system would behave under 500ms of artificial latency. We moved from "hoping it works" to "knowing it works because we broke it on purpose."
 
@@ -498,7 +495,7 @@ By using SSI, we moved the complexity of concurrency control from our Go code to
 
 ## The Secret Engine: Zero-Trust Key Management with Vault
 
-Even with the best mTLS identities (SPIRE), a system is only as secure as its "Root of Trust." In FinCore, we don't store database passwords, API keys, or JWT signing secrets in environment variables or Kubernetes Secrets. We use **HashiCorp Vault** as our centralized **Secret Engine**.
+Even with the best mTLS identities (SPIRE), a system is only as secure as its "Root of Trust." Database passwords, API keys, or JWT signing secrets are not stored in environment variables or Kubernetes Secrets. **HashiCorp Vault** is used as a centralized **Secret Engine**.
 
 ### Dynamic Credentials: The Death of the Static Password
 The most powerful feature of our Vault integration is **Dynamic Credentials**. When the `ledger-service` starts up, it doesn't have a database password. It uses its SPIFFE ID to authenticate with Vault, which then generates a *unique, short-lived* PostgreSQL user specifically for that pod. 
@@ -515,7 +512,7 @@ The database only ever sees the ciphertext. This ensures that even a "Superuser"
 In a distributed system with 12 services, the most common cause of "silent" failures is **API Drift**. This happens when Service A updates its expectations of a field, but Service B continues to send the old format. In a banking system, an API drift can lead to a "Null Pointer Exception" that accidentally drops a transaction or miscalculates a fee.
 
 ### Protobuf as the Single Source of Truth
-We rejected the "JSON-over-HTTP" model for internal communication. Instead, we adopted a **Schema-First** approach using **Protocol Buffers (Protobuf)**. Every service in FinCore defines its interface in a `.proto` file. These files are stored in a central repository (or a shared folder in our monorepo) and are used to generate the Go client and server stubs.
+We rejected the "JSON-over-HTTP" model for internal communication. Instead, we adopted a **Schema-First** approach using **Protocol Buffers (Protobuf)**. Every service defines its interface in a `.proto` file. These files are stored in a central repository (or a shared folder in the monorepo) and are used to generate the Go client and server stubs.
 
 This ensures that the "Contract" is the single source of truth. If an engineer wants to change the `ledger.Transaction` message, they must update the `.proto` file first. The Go compiler then forces every service that uses that message to handle the change. We moved the detection of API errors from "Runtime" to "Compile Time."
 
@@ -526,7 +523,7 @@ We also implemented **Protobuf Descriptor Validation** in our CI pipeline. Every
 
 ## The Observation Deck: Telemetry, Tracing, and the 'Three Pillars'
 
-You cannot secure or optimize what you cannot measure. In the early days of FinCore, we realized that "Logs" were insufficient for understanding the behavior of a multi-region gRPC backbone. We needed a unified **Observability Stack** that treated Telemetry as a first-class citizen.
+You cannot secure or optimize what cannot be measured. In the early days of this project, it was realized that "Logs" were insufficient for understanding the behavior of a multi-region gRPC backbone. A unified **Observability Stack** was needed that treated Telemetry as a first-class citizen.
 
 ### Distributed Tracing with OpenTelemetry
 We integrated **OpenTelemetry (OTel)** into every service. When a request enters the `@/services/api-gateway`, it is assigned a `trace_id`. This ID is propagated through every internal gRPC call and every database query. 
@@ -543,7 +540,7 @@ If the `reporting-service` falls behind its projection loop (the lag increases),
 In a banking core, "testing" is not a separate phase; it is the skeleton that holds the system together. We adopted a **Quality Quadrant** model that covers everything from unit tests to formal verification. In a system where a single logical error can result in millions of dollars of misdirected funds, "it works on my machine" is an admission of failure.
 
 ### Property-Based Testing: Beyond the Example
-Most developers write "Example-Based" tests: `assert(add(2, 2) == 4)`. For FinCore’s `@/services/ledger-service`, examples are insufficient. We used **Property-Based Testing** (via libraries like `rapid` for Go) to verify the mathematical invariants of our logic.
+Most developers write "Example-Based" tests: `assert(add(2, 2) == 4)`. For the `@/services/ledger-service`, examples are insufficient. **Property-Based Testing** (via libraries like `rapid` for Go) was used to verify the mathematical invariants of the logic.
 
 Instead of testing specific numbers, we define properties: "For any account A and amount X, a successful transfer must result in `Balance(A) - X` and `Balance(B) + X`, and the sum of all balances must remain constant." The test runner then generates thousands of random, edge-case scenarios—negative amounts, zero-balance accounts, concurrent transfers—to try and break these invariants. If the property holds for ten million random inputs, our confidence in the core logic moves from "high" to "absolute."
 
@@ -554,7 +551,7 @@ TLA+ allows us to "Check the Math" of our distributed algorithms. It can exhaust
 
 ## The Financial Safety Net: Reconciliation and the 'Triple-Entry' Loop
 
-No matter how many tests you write, the real world is messy. Bits flip in memory, network cards malfunction, and cosmic rays (rarely but truly) can corrupt data. For FinCore, we implemented an autonomous **Reconciliation Layer** that acts as our final safety net.
+No matter how many tests are written, the real world is messy. Bits flip in memory, network cards malfunction, and cosmic rays (rarely but truly) can corrupt data. An autonomous **Reconciliation Layer** was implemented to act as the final safety net.
 
 ### The Continuous Auditor
 In the background, the `@/services/reporting-service` constantly performs a "Continuous Reconciliation." It reads the raw event stream from the Event Store and compares it against the projected state in ClickHouse and the current balances in PostgreSQL.
@@ -568,7 +565,7 @@ This eliminates the "Penny-Slicing" vulnerability (popularized by *Office Space*
 
 ## The Evolution of the Core: Zero-Downtime Schema Migrations
 
-In a traditional database environment, updating the schema (e.g., adding a column or changing an index) often requires a table lock, which results in downtime. For a global bank like FinCore, even a five-minute maintenance window is unacceptable. We had to engineer a way to evolve our database schema without ever taking the system offline.
+In a traditional database environment, updating the schema (e.g., adding a column or changing an index) often requires a table lock, which results in downtime. For a global bank, even a five-minute maintenance window is unacceptable. A way to evolve the database schema without ever taking the system offline had to be engineered.
 
 ### The Expand-Contract Pattern
 We adopted the **Expand-Contract (or Parallel-Change)** pattern for all migrations. Instead of one large, destructive change, we break every schema evolution into three distinct, safe phases:
@@ -617,7 +614,7 @@ By running our `@/services/audit-service` inside an enclave, we ensure that the 
 In a distributed system, a "Running" process is not necessarily a "Healthy" process. We observed that standard Kubernetes `Liveness` and `Readiness` probes often provide a false sense of security. A service might be "Up" (responding to HTTP/8080) but "Broken" (unable to talk to the database or the vault).
 
 ### Deep Health Checks
-We implemented **Deep Health Checks** across all 12 services. A FinCore health check doesn't just return a `200 OK`. It performs a "ping" on all its dependencies:
+**Deep Health Checks** were implemented across all 12 services. A health check doesn't just return a `200 OK`. It performs a "ping" on all its dependencies:
 ```go
 h.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 	if pool == nil {
@@ -655,9 +652,9 @@ We also leveraged the newer `GOMEMLIMIT` and `GOGC` tuning parameters to optimiz
 As a Distinguished Engineer, you realize that the most important "feature" of a banking core is its **Longevity**. The mainframes of the 1970s are still running today because they were built with a level of rigor that modern "move fast and break things" startups often ignore.
 
 ### The Legacy of the Future
-We built FinCore not for the next quarter, but for the next fifty years. We chose technologies (Go, PostgreSQL, Protobuf, SPIRE) that have a strong commitment to stability and backward compatibility. We documented our "Why" (through ADRs - Architecture Decision Records) as much as our "How."
+This architecture was built not for the next quarter, but for the next fifty years. Technologies (Go, PostgreSQL, Protobuf, SPIRE) were chosen that have a strong commitment to stability and backward compatibility. "Why" was documented (through ADRs - Architecture Decision Records) as much as "How."
 
-When the next generation of engineers inherits FinCore in 2076, they will find a system that is still understandable, still verifiable, and still capable of providing certainty. We didn't just write code; we authored a legacy. We moved from "building a product" to "engineering a monument."
+When the next generation of engineers inherits this system in 2076, they will find one that is still understandable, still verifiable, and still capable of providing certainty. Code wasn't just written; a legacy was authored. The move was made from "building a product" to "engineering a monument."
 
 ## Conclusion: The Architecture of Certainty
 
