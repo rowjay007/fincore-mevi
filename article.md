@@ -1,8 +1,8 @@
-# The Architecture of Certainty: Engineering a Multi-Region Banking Core from the Ground Up
+# Engineering for Resilience: A Deep Dive into Multi-Region Distributed Systems
 
 The first time I saw a distributed system fail in a way that actually mattered, it wasn't a spectacular crash. There were no sirens, no cascading 500 errors, and no immediate panic. It was a single ledger entry in a settlement service that simply... wasn't there. A message had been "successfully" acknowledged by a broker, a database transaction had committed, and a client had received a 200 OK. But 800 milliseconds later, in a datacenter three thousand miles away, the state of the world diverged. A system had been built that optimized for the "happy path" of local consistency and lost the war against entropy.
 
-The Architecture of Certainty was born from the scar tissue of those failures. When setting out to build this banking core, the project didn't start with a feature list; it started with a threat model. We assumed the network was malicious, the infrastructure was ephemeral, and the developers (including ourselves) were prone to the kind of "optimistic concurrency" that leads to financial ruin. This is the account of how a system was engineered to survive the messy reality of global finance—a deep dive into the code, the tradeoffs, and the architectural philosophy of a platform that treats "certainty" as its primary primitive.
+This technical retrospective was born from the scar tissue of those failures. When setting out to build a multi-region banking core, the project didn't start with a feature list; it started with a threat model. We assumed the network was malicious, the infrastructure was ephemeral, and the developers (including ourselves) were prone to the kind of "optimistic concurrency" that leads to financial ruin. This is the account of how a system was engineered to survive the messy reality of global finance—a deep dive into the code, the tradeoffs, and the architectural philosophy of a platform that treats "certainty" as its primary primitive.
 
 ## The Ghost in the Machine: Why We Stopped Trusting the Network
 
@@ -11,7 +11,7 @@ In the early days of this architecture, a fundamental fork in the road appeared:
 ### The Lessons of 2012: From Knight Capital to Today
 Consider the infamous Knight Capital incident of 2012, where a dormant codebase and a failed deployment led to $440 million in losses in just 45 minutes. The root cause wasn't just a bug; it was a lack of systemic observability and an over-reliance on the network behaving as expected. We took this as a foundational warning. In today's "cloud-native" world, the fallacies of distributed computing—that the network is reliable, that latency is zero, and that bandwidth is infinite—are more dangerous than ever because they are masked by the convenience of managed services.
 
-We chose the architecture of certainty. This meant that every architectural decision—from the choice of Go as our primary language to the implementation of SPIRE for workload identity—was evaluated on its ability to provide a verifiable, immutable record of intent. We stopped trusting the network's promise of delivery and started demanding cryptographic proof.
+A resilience-first architecture was chosen. This meant that every architectural decision—from the choice of Go as the primary language to the implementation of SPIRE for workload identity—was evaluated on its ability to provide a verifiable, immutable record of intent. We stopped trusting the network's promise of delivery and started demanding cryptographic proof.
 
 ### The Fallacy of the Local Commit and the "Two Generals" Problem
 In a monolithic database environment, consistency is "free"—or at least, it's the database's problem. Once you cross the boundary into microservices, consistency becomes an application-level concern. We observed a recurring failure mode in traditional systems: the "Partial Success" ghost. A service would update its local state, attempt to notify a downstream consumer, and fail due to a transient network blip. The result is a divergence that only surfaces during end-of-day reconciliation.
@@ -656,7 +656,7 @@ This architecture was built not for the next quarter, but for the next fifty yea
 
 When the next generation of engineers inherits this system in 2076, they will find one that is still understandable, still verifiable, and still capable of providing certainty. Code wasn't just written; a legacy was authored. The move was made from "building a product" to "engineering a monument."
 
-## Conclusion: The Architecture of Certainty
+## Conclusion: Engineering for Inevitable Failure
 
 In the end, we didn't build a system that *cannot* fail. We built a system that *knows* when it has failed, can prove its state after the fact, and can recover without compromising its integrity. In the world of global finance, that is the only certainty there is.
 
