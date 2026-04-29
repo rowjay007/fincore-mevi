@@ -9,7 +9,7 @@ This technical retrospective is derived from the engineering required to prevent
 The fundamental choice in distributed architecture is between performance and certainty. In banking, "performance" is a siren song. It leads toward asynchronous fire-and-forget patterns and eventually toward the graveyard of eventual consistency. A bank that is eventually consistent is simply a very fast way to lose money. 
 
 ### Systems Observability: From Knight Capital to Modern Cloud
-The infamous Knight Capital incident of 2012, where a dormant codebase and a failed deployment led to $440 million in losses in 45 minutes, serves as a foundational warning. The root cause was a lack of systemic observability and an over-reliance on expected network behavior. In the modern "cloud-native" world, the fallacies of distributed computing (that the network is reliable, latency is zero, and bandwidth is infinite) are more dangerous than ever because they are masked by the convenience of managed services.
+The infamous Knight Capital incident of 2012, where a dormant codebase and a failed deployment led to $440 million in losses in 45 minutes, serves as a foundational warning. The root cause was a lack of systemic observability and an over-reliance on expected network behaviour. In the modern "cloud-native" world, the fallacies of distributed computing (that the network is reliable, latency is zero, and bandwidth is infinite) are more dangerous than ever because they are masked by the convenience of managed services.
 
 A resilience-first architecture is required. Every architectural decision, from the choice of Go as the primary language to the implementation of SPIRE for workload identity, must be evaluated on its ability to provide a verifiable, immutable record of intent. Trust in the network's promise of delivery is replaced by a requirement for cryptographic proof.
 
@@ -466,7 +466,7 @@ Treating operational procedures as code reduces the "Mean Time To Repair" (MTTR)
 ### The Art of the Post-Mortem
 A failure is not a cause for blame; it is a gift of information. Every outage, regardless of size, results in a **Blameless Post-Mortem**. The "Five Whys" technique is used to dig past the immediate symptom (e.g., "The database was slow") to the root cause (e.g., "The connection pool logic was missing a context deadline"). 
 
-This culture of psychological safety allows for continuous improvement. The integration of a chaos engine into the gateway acknowledges that the behavior of a complex system under stress (such as 500ms of artificial latency) cannot be assumed. The transition is made from "hoping it works" to "verifying it works through intentional failure."
+This culture of psychological safety allows for continuous improvement. The integration of a chaos engine into the gateway acknowledges that the behaviour of a complex system under stress (such as 500ms of artificial latency) cannot be assumed. The transition is made from "hoping it works" to "verifying it works through intentional failure."
 
 ## The Transactional Bedrock: Mastering PostgreSQL Isolation Levels
 
@@ -520,7 +520,7 @@ To maintain zero-downtime deployments, a strict rule is followed: **Fields are n
 
 ## The Observation Deck: Telemetry, Tracing, and the 'Three Pillars'
 
-You cannot secure or optimize what cannot be measured. High-quality observability is required for understanding the behavior of a multi-region gRPC backbone. A unified **Observability Stack** is necessary to treat Telemetry as a first-class citizen.
+You cannot secure or optimize what cannot be measured. High-quality observability is required for understanding the behaviour of a multi-region gRPC backbone. A unified **Observability Stack** is necessary to treat Telemetry as a first-class citizen.
 
 ### Distributed Tracing with OpenTelemetry
 **OpenTelemetry (OTel)** is integrated into every service. When a request enters the `@/services/api-gateway`, it is assigned a `trace_id`. This ID propagates through every internal gRPC call and database query. 
