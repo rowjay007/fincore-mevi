@@ -453,7 +453,7 @@ When a regional failure is detected, the `@/services/identity-service` and `@/se
 
 ## The Human Protocol: Blamelessness and the Culture of Rigor
 
-As a Distinguished Engineer, you realize that the most complex component of any system is the human operator. You can build the most resilient gRPC backbone in the world, but if a tired engineer runs a `DELETE` without a `WHERE` clause in production, the system will fail.
+As an Engineer, you realize that the most complex component of any system is the human operator. You can build the most resilient gRPC backbone in the world, but if a tired engineer runs a `DELETE` without a `WHERE` clause in production, the system will fail.
 
 ### Runbooks as a First-Class Language
 Runbooks** were treated with the same rigor as Go code. Every runbook in the `docs/runbooks` directory is:
@@ -544,7 +544,7 @@ Instead of testing specific numbers, properties are defined: "For any account A 
 ### TLA+ and Formal Specification
 For critical cross-service protocols (such as Saga Orchestration and cross-region Quorum), **Formal Verification** is employed. **TLA+ (Temporal Logic of Actions)** is used to model the state transitions of the system before implementation.
 
-TLA+ allows the "Math" of distributed algorithms to be checked. It can exhaustively explore every possible interleaving of network failures, service crashes, and database timeouts to ensure that a "Split-Brain" or a "Deadlock" is mathematically impossible. This "Design-First" approach is what separates a Distinguished Engineer from a Senior Developer: distributed systems failures are not just "debugged," they are specified out of existence.
+TLA+ allows the "Math" of distributed algorithms to be checked. It can exhaustively explore every possible interleaving of network failures, service crashes, and database timeouts to ensure that a "Split-Brain" or a "Deadlock" is mathematically impossible. This "Design-First" approach is what separates an Engineer from a Senior Developer: distributed systems failures are not just "debugged," they are specified out of existence.
 
 ## The Financial Safety Net: Reconciliation and the 'Triple-Entry' Loop
 
@@ -644,7 +644,7 @@ To address this, the core payment path is optimized for "Zero-Allocation." The u
 Leveraging the `GOMEMLIMIT` and `GOGC` tuning parameters optimizes resource usage in Kubernetes. Instead of relying on the Go runtime to estimate memory availability, `GOMEMLIMIT` is explicitly set to 90% of the pod's memory limit. This ensures the GC becomes more aggressive as it approaches the limit, preventing **OOM (Out Of Memory)** kills while maximizing performance. The transition is made from "default settings" to "runtime mastery."
 
 Engineering for the Next Fifty Years
-As a Distinguished Engineer, the realization emerges that the most important "feature" of a banking core is its **Longevity**. The mainframes of the 1970s remain operational today because they were engineered with a level of rigor that modern "move fast and break things" methodologies often neglect.
+As an Engineer, the realization emerges that the most important "feature" of a banking core is its **Longevity**. The mainframes of the 1970s remain operational today because they were engineered with a level of rigor that modern "move fast and break things" methodologies often neglect.
 
 ### The Legacy of the Future
 This architecture was built not for the next quarter, but for the next fifty years. Technologies (Go, PostgreSQL, Protobuf, SPIRE) were chosen that have a strong commitment to stability and backward compatibility. "Why" was documented (through ADRs - Architecture Decision Records) as much as "How."
