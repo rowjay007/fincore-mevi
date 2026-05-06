@@ -43,6 +43,7 @@ func verifyEd25519JWT(tokenStr string, lookup func(ctx context.Context, kid stri
 		UserID:      claims.Subject,
 		Roles:       claims.Roles,
 		Permissions: claims.Permissions,
+		LSN:         claims.LSN,
 		IssuedAt:    claims.IssuedAt.Time,
 		ExpiredAt:   claims.ExpiresAt.Time,
 	}, nil

@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -170,6 +171,10 @@ func withJWTAuth(verifier *security.JWKSVerifier, publicPrefixes []string, next 
 		if err != nil {
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
+		}
+
+		if payload.LSN != 0 {
+			r.Header.Set("X-Fincore-LSN", strconv.FormatUint(payload.LSN, 10))
 		}
 
 		r.Header.Set("X-Fincore-Subject", payload.UserID)

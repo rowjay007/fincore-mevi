@@ -18,6 +18,7 @@ type TokenPayload struct {
 	UserID      string    `json:"user_id"`
 	Roles       []string  `json:"roles"`
 	Permissions []string  `json:"permissions"`
+	LSN         uint64    `json:"lsn,omitempty"`
 	IssuedAt    time.Time `json:"iat"`
 	ExpiredAt   time.Time `json:"exp"`
 }
@@ -35,6 +36,7 @@ type Ed25519JWTMaker struct {
 type jwtClaims struct {
 	Roles       []string `json:"roles"`
 	Permissions []string `json:"permissions"`
+	LSN         uint64   `json:"lsn,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -52,6 +54,7 @@ func (maker *Ed25519JWTMaker) CreateToken(payload TokenPayload) (string, error) 
 	claims := jwtClaims{
 		Roles:       payload.Roles,
 		Permissions: payload.Permissions,
+		LSN:         payload.LSN,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   payload.UserID,
 			IssuedAt:  jwt.NewNumericDate(payload.IssuedAt),
