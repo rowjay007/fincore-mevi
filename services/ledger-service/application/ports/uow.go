@@ -17,8 +17,8 @@ type OutboxStore interface {
 }
 
 type BalanceRepository interface {
-	GetBalanceKobo(ctx context.Context, accountID string) (int64, error)
-	ApplyDelta(ctx context.Context, accountID string, deltaKobo int64) error
+	GetBalanceKobo(ctx context.Context, accountID string, version int) (int64, error)
+	ApplyDelta(ctx context.Context, accountID string, deltaKobo int64, version int) error
 }
 
 type IdempotencyRepository interface {

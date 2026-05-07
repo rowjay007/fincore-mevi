@@ -11,18 +11,20 @@ import (
 )
 
 type LedgerProjectionWorker struct {
-	es      ports.LedgerEventStore
-	bal     ports.BalanceRepository
-	batch   int
-	polling time.Duration
+	es                ports.LedgerEventStore
+	bal               ports.BalanceRepository
+	projectionVersion int
+	batch             int
+	polling           time.Duration
 }
 
-func NewLedgerProjectionWorker(es ports.LedgerEventStore, bal ports.BalanceRepository) *LedgerProjectionWorker {
+func NewLedgerProjectionWorker(es ports.LedgerEventStore, bal ports.BalanceRepository, version int) *LedgerProjectionWorker {
 	return &LedgerProjectionWorker{
-		es:      es,
-		bal:     bal,
-		batch:   100,
-		polling: 1 * time.Second,
+		es:                es,
+		bal:               bal,
+		projectionVersion: version,
+		batch:             100,
+		polling:           1 * time.Second,
 	}
 }
 
@@ -77,7 +79,7 @@ func (w *LedgerProjectionWorker) processNextBatch(ctx context.Context, lastSeq i
 		if ev.EntryType == domain.EntryTypeWithdrawal {
 			delta = -delta
 		}
-		if err := w.bal.ApplyDelta(ctx, ev.AccountID.String(), delta); err != nil {
+		if err := w.bal.ApplyDelta(ctx, ev.AccountID.String(), delta, w.projectionVersion); err != nil {
 			return 0, lastSeq, err
 		}
 	}
