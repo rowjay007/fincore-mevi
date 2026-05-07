@@ -19,7 +19,7 @@ func NewBalanceQuery(pool *pgxpool.Pool) *BalanceQuery {
 	return &BalanceQuery{pool: pool}
 }
 
-func (q *BalanceQuery) GetBalanceKobo(ctx context.Context, accountID string) (int64, error) {
+func (q *BalanceQuery) GetBalanceKobo(ctx context.Context, accountID string, version int) (int64, error) {
 	requiredLSN, _ := ctx.Value(security.LSNContextKey).(uint64)
 
 	if requiredLSN != 0 {
@@ -48,7 +48,7 @@ func (q *BalanceQuery) GetBalanceKobo(ctx context.Context, accountID string) (in
 	}
 
 READY:
-	row := q.pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, accountID)
+	row := q.pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1 and projection_version = $2`, accountID, version)
 	var bal int64
 	err := row.Scan(&bal)
 	if err != nil {

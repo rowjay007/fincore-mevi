@@ -25,19 +25,19 @@ func TestBalanceRepo_ApplyDelta(t *testing.T) {
 	accountID := ids.New().String()
 
 	// Initial deposit
-	err := repo.ApplyDelta(ctx, accountID, 1000)
+	err := repo.ApplyDelta(ctx, accountID, 1000, 1)
 	if err != nil {
 		t.Fatalf("ApplyDelta failed: %v", err)
 	}
 
-	bal, _ := repo.GetBalanceKobo(ctx, accountID)
+	bal, _ := repo.GetBalanceKobo(ctx, accountID, 1)
 	if bal != 1000 {
 		t.Errorf("expected 1000, got %d", bal)
 	}
 
 	// Update
-	repo.ApplyDelta(ctx, accountID, -200)
-	bal, _ = repo.GetBalanceKobo(ctx, accountID)
+	repo.ApplyDelta(ctx, accountID, -200, 1)
+	bal, _ = repo.GetBalanceKobo(ctx, accountID, 1)
 	if bal != 800 {
 		t.Errorf("expected 800, got %d", bal)
 	}

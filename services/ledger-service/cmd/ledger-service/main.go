@@ -99,7 +99,7 @@ func main() {
 	balQuery := ledgerpg.NewBalanceQuery(pool)
 
 	// 3b. Projection Worker
-	projectionWorker := workers.NewLedgerProjectionWorker(uow.LedgerStore(), uow.Balance())
+	projectionWorker := workers.NewLedgerProjectionWorker(uow.LedgerStore(), uow.Balance(), 1)
 	go projectionWorker.Start(ctx)
 
 	l, err := net.Listen("tcp", addr)

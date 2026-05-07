@@ -20,7 +20,7 @@ type Server struct {
 }
 
 type BalanceQuery interface {
-	GetBalanceKobo(ctx context.Context, accountID string) (int64, error)
+	GetBalanceKobo(ctx context.Context, accountID string, version int) (int64, error)
 }
 
 func NewServer(post *commands.PostEntryHandler, bal BalanceQuery) *Server {
@@ -73,7 +73,7 @@ func (s *Server) GetBalance(ctx context.Context, req *ledgerv1.GetBalanceRequest
 		return nil, errors.New("account_id required")
 	}
 
-	bal, err := s.bal.GetBalanceKobo(ctx, req.Account.AccountId)
+	bal, err := s.bal.GetBalanceKobo(ctx, req.Account.AccountId, 1)
 	if err != nil {
 		return nil, err
 	}

@@ -331,7 +331,7 @@ func TestLedger_BalanceProjectionRebuild(t *testing.T) {
 
 	// Assert command path balance is correct (1000 - 250 + 250 = 1000)
 	var bal int64
-	if err := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, acct.String()).Scan(&bal); err != nil {
+	if err := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1 and projection_version = 1`, acct.String()).Scan(&bal); err != nil {
 		t.Fatalf("get balance: %v", err)
 	}
 	if bal != 1000 {
@@ -343,7 +343,7 @@ func TestLedger_BalanceProjectionRebuild(t *testing.T) {
 		t.Fatalf("truncate balances: %v", err)
 	}
 
-	w := workers.NewLedgerProjectionWorker(uow.LedgerStore(), uow.Balance())
+	w := workers.NewLedgerProjectionWorker(uow.LedgerStore(), uow.Balance(), 1)
 	var seq int64
 	for {
 		processed, nextSeq, err := w.ProcessNextBatch(ctx, seq)
@@ -357,7 +357,7 @@ func TestLedger_BalanceProjectionRebuild(t *testing.T) {
 	}
 
 	bal = 0
-	if err := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1`, acct.String()).Scan(&bal); err != nil {
+	if err := pool.QueryRow(ctx, `select balance_kobo from ledger_account_balances where account_id = $1 and projection_version = 1`, acct.String()).Scan(&bal); err != nil {
 		t.Fatalf("get rebuilt balance: %v", err)
 	}
 	if bal != 1000 {

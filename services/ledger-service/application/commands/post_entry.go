@@ -61,7 +61,7 @@ func (h *PostEntryHandler) Handle(ctx context.Context, cmd PostEntry) (*PostEntr
 			return nil
 		}
 
-		currentBal, err := bal.GetBalanceKobo(ctx, cmd.AccountID.String())
+		currentBal, err := bal.GetBalanceKobo(ctx, cmd.AccountID.String(), 1)
 		if err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func (h *PostEntryHandler) Handle(ctx context.Context, cmd PostEntry) (*PostEntr
 				return err
 			}
 		}
-		if err := bal.ApplyDelta(ctx, cmd.AccountID.String(), delta); err != nil {
+		if err := bal.ApplyDelta(ctx, cmd.AccountID.String(), delta, 1); err != nil {
 			return err
 		}
 		if err := idem.Save(ctx, cmd.IdempotencyKey, entry.ID().String()); err != nil {
