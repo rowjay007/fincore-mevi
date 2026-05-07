@@ -14,6 +14,12 @@ var (
 	ErrExpiredToken = errors.New("expired token")
 )
 
+type contextKey string
+
+const (
+	LSNContextKey contextKey = "lsn"
+)
+
 type TokenPayload struct {
 	UserID      string    `json:"user_id"`
 	Roles       []string  `json:"roles"`

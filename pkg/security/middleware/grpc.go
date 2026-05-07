@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"os"
+	"strconv"
 	"strings"
 
 	"fincore/pkg/security"
@@ -92,8 +93,16 @@ func payloadFromGatewayHeaders(ctx context.Context) (*security.TokenPayload, boo
 
 	roles := splitCSV(firstMDValue(md, "x-fincore-roles", "X-Fincore-Roles"))
 	perms := splitCSV(firstMDValue(md, "x-fincore-permissions", "X-Fincore-Permissions"))
+	lsnStr := firstMDValue(md, "x-fincore-lsn", "X-Fincore-LSN")
 
-	return &security.TokenPayload{UserID: subject, Roles: roles, Permissions: perms}, true
+	var lsn uint64
+	if lsnStr != "" {
+		if val, err := strconv.ParseUint(lsnStr, 10, 64); err == nil {
+			lsn = val
+		}
+	}
+
+	return &security.TokenPayload{UserID: subject, Roles: roles, Permissions: perms, LSN: lsn}, true
 }
 
 func firstMDValue(md metadata.MD, keys ...string) string {
@@ -191,6 +200,10 @@ func UnaryAuthzInterceptor(tokens security.TokenMaker, suffixToRequiredPerm map[
 			if !allowed {
 				return nil, status.Error(codes.PermissionDenied, "forbidden")
 			}
+		}
+
+		if payload.LSN != 0 {
+			ctx = context.WithValue(ctx, security.LSNContextKey, payload.LSN)
 		}
 
 		return handler(ctx, req)
