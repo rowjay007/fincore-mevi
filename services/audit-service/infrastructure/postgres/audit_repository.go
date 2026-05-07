@@ -26,9 +26,9 @@ func NewAuditRepository(db *pgxpool.Pool) *AuditRepository {
 }
 
 func (r *AuditRepository) Save(ctx context.Context, entry *auditv1.AuditLogEntry) error {
-	// 1. Fetch the hash of the latest entry to create the Merkle Chain
+	// 1. Fetch the hash of the latest entry to create the Merkle Chain using the monotonic sequence
 	var lastHash string
-	err := r.db.QueryRow(ctx, "select current_hash from audit_logs order by created_at desc limit 1").Scan(&lastHash)
+	err := r.db.QueryRow(ctx, "select current_hash from audit_logs order by sequence desc limit 1").Scan(&lastHash)
 	if err != nil && err != pgx.ErrNoRows {
 		// Only log real errors; empty result is expected for first entry
 		log.Printf("failed to fetch last hash: %v", err)
@@ -65,11 +65,11 @@ func (r *AuditRepository) CalculateHash(entry *auditv1.AuditLogEntry, previousHa
 }
 
 func (r *AuditRepository) ValidateIntegrity(ctx context.Context, startID, endID string) (bool, int32, string, error) {
-	// Mastery: Full cryptographic chain verification
+	// Mastery: Full cryptographic chain verification using sequence-based ordering
 	rows, err := r.db.Query(ctx, `
 		select id, user_id, action, resource_type, resource_id, payload, correlation_id, trace_id, service_name, previous_hash, current_hash
 		from audit_logs
-		order by created_at asc
+		order by sequence asc
 	`)
 	if err != nil {
 		return false, 0, "", err
@@ -130,7 +130,7 @@ func (r *AuditRepository) List(ctx context.Context, req *auditv1.ListAuditLogsRe
 		where ($1 = '' or user_id = $1)
 		  and ($2 = '' or resource_type = $2)
 		  and ($3 = '' or resource_id = $3)
-		order by created_at desc
+		order by sequence desc
 		limit $4
 	`, req.UserId, req.ResourceType, req.ResourceId, limit)
 	if err != nil {
